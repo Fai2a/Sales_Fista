@@ -19,16 +19,13 @@ chrome.runtime.onMessage.addListener((request: ExtensionMessage, _sender: chrome
       const designation = getText('.text-body-medium.break-words') || getText('div[data-generated-suggestion-target]');
       const location = getText('.text-body-small.inline.t-black--light.break-words') || getText('span.text-body-small.inline');
       
-      // Sometimes company is the first item in the experiences section or listed in the top card
       const companyElement = document.querySelector('button[aria-label*="Current company"] .inline-show-more-text');
       const company = companyElement ? (companyElement.textContent || '').trim() : '';
 
-      // Profile url is current url without query params
       const profileUrl = window.location.href.split('?')[0];
 
-      // Wait a tiny bit for images to be lazy-loaded if needed, but we'll try to just grab it
       let photoUrl = getAttr('img.pv-top-card-profile-picture__image', 'src') || getAttr('.profile-photo-edit__preview', 'src');
-      if (photoUrl && photoUrl.startsWith('data:image')) photoUrl = ''; // Avoid huge base64
+      if (photoUrl && photoUrl.startsWith('data:image')) photoUrl = ''; 
       
       let connectionCount = getText('ul.pv-top-card--list span.t-bold') || getText('li.text-body-small span.t-bold');
       if (!connectionCount) {
@@ -55,13 +52,39 @@ chrome.runtime.onMessage.addListener((request: ExtensionMessage, _sender: chrome
       };
     };
 
-    // Scroll to bottom and top slightly to trigger lazy-loaded elements like the image
     window.scrollTo(0, 500);
     setTimeout(() => {
       window.scrollTo(0, 0);
       sendResponse({ data: scrapeData() });
     }, 500);
 
-    return true; // indicates asynchronous response
+    return true; 
+  }
+
+  if (request.action === 'SCRAPE_CONTACT_INFO') {
+    // Attempt to click contact info link
+    const contactInfoLink = document.querySelector('a#top-card-text-details-contact-info') as HTMLAnchorElement;
+    if (contactInfoLink) {
+      contactInfoLink.click();
+      
+      setTimeout(() => {
+        const emailLink = document.querySelector('a[href^="mailto:"]') as HTMLAnchorElement;
+        const phoneSection = Array.from(document.querySelectorAll('section.pv-contact-info__contact-type')).find(el => el.querySelector('svg[data-test-icon="phone-handset-medium"]'));
+        const phoneItem = phoneSection ? phoneSection.querySelector('span.t-14') || phoneSection.querySelector('li') : null;
+
+        const email = emailLink ? emailLink.textContent?.replace('mailto:', '')?.trim() : '';
+        const phone = phoneItem ? phoneItem.textContent?.trim() : '';
+
+        // Close the modal
+        const closeBtn = document.querySelector('button[aria-label="Dismiss"]') as HTMLButtonElement;
+        if (closeBtn) closeBtn.click();
+
+        sendResponse({ data: { email, phone } });
+      }, 1500); // give time for modal to render
+    } else {
+      // Fallback if contact info link not found
+      sendResponse({ data: { email: '', phone: '' } });
+    }
+    return true;
   }
 });

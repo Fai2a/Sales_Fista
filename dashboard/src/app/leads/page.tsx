@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import Link from 'next/link';
 import { Search, Filter, MoreHorizontal, FileDown, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import { StatusFilter } from '@/components/StatusFilter';
 
 export default async function LeadsPage({
   searchParams,
@@ -57,23 +58,10 @@ export default async function LeadsPage({
           />
         </form>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+       <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <div className="flex items-center gap-2 bg-slate-900/50 border border-[#1e2d45] rounded-xl px-2 py-1">
              <Filter className="w-3.5 h-3.5 text-slate-500 ml-1" />
-             <select 
-               name="status"
-               defaultValue={statusFilter}
-               className="bg-transparent text-sm text-slate-300 py-1 pr-6 cursor-pointer focus:outline-none appearance-none font-medium"
-               onChange={(e) => {
-                 window.location.href = `/leads?status=${e.target.value}${query ? `&q=${query}` : ''}`
-               }}
-             >
-               <option value="" className="bg-slate-900">All Statuses</option>
-               <option value="NEW" className="bg-slate-900">New</option>
-               <option value="CONTACTED" className="bg-slate-900">Contacted</option>
-               <option value="QUALIFIED" className="bg-slate-900">Qualified</option>
-               <option value="REJECTED" className="bg-slate-900">Rejected</option>
-             </select>
+             <StatusFilter currentStatus={statusFilter} currentQuery={query} />
           </div>
         </div>
       </div>
@@ -84,12 +72,14 @@ export default async function LeadsPage({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#1e2d45] bg-slate-900/50 text-xs uppercase tracking-wider text-slate-500 font-bold">
-                <th className="px-6 py-4 w-[60px]"></th>
-                <th className="px-6 py-4">Prospect</th>
+                <th className="px-6 py-4">Name</th>
                 <th className="px-6 py-4">Company</th>
-                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Email</th>
+                <th className="px-6 py-4">Phone</th>
+                <th className="px-6 py-4">City</th>
+                <th className="px-6 py-4">Designation</th>
                 <th className="px-6 py-4">Saved</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e2d45]/50">
@@ -100,35 +90,15 @@ export default async function LeadsPage({
                   style={{ animationDelay: `${index * 50}ms`, animation: 'fade-in-up 0.5s ease-out forwards', opacity: 0 }}
                 >
                   <td className="px-6 py-4">
-                    <div className="w-10 h-10 rounded-full bg-slate-800 border border-[#1e2d45] overflow-hidden shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={lead.photoUrl || 'https://via.placeholder.com/150'} alt="" className="w-full h-full object-cover" />
-                    </div>
+                    <Link href={`/leads/${lead.id}`} className="font-bold text-white hover:text-blue-400 text-sm transition-colors">
+                      {lead.name}
+                    </Link>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <Link href={`/leads/${lead.id}`} className="font-bold text-white hover:text-blue-400 font-heading text-lg transition-colors">
-                        {lead.name}
-                      </Link>
-                      <span className="text-sm text-slate-400 truncate max-w-[250px]">{lead.designation}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-slate-300">{lead.company || '-'}</span>
-                      <span className="text-xs text-slate-500">{lead.location}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
-                        lead.status === 'NEW' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                        lead.status === 'CONTACTED' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
-                        lead.status === 'QUALIFIED' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                        'bg-red-500/10 text-red-400 border-red-500/20'
-                    }`}>
-                      {lead.status}
-                    </span>
-                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-300">{lead.company || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-300">{lead.email || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-300">{lead.phone || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-300">{lead.location || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-300 max-w-[200px] truncate">{lead.designation || '-'}</td>
                   <td className="px-6 py-4 text-sm text-slate-400 whitespace-nowrap">
                     {format(new Date(lead.savedAt), 'MMM dd, yyyy')}
                   </td>
