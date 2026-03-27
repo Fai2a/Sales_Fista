@@ -10,13 +10,14 @@ export async function POST(req: Request) {
     const newLead = await prisma.lead.create({
       data: {
         name: data.name,
-        designation: data.designation,
         company: data.company,
+        designation: data.designation,
         location: data.location,
+        city: data.city,
         email: data.email,
         phone: data.phone,
-        profileUrl: data.profileUrl,
-        photoUrl: data.photoUrl,
+        linkedin_url: data.linkedin_url,
+        profile_image: data.profile_image,
         bio: data.bio,
         connectionCount: data.connectionCount,
       }
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('q') || '';
     const status = searchParams.get('status') || '';
-    const sort = searchParams.get('sort') || 'savedAt:desc';
+    const sort = searchParams.get('sort') || 'saved_at:desc';
 
     const [sortField, sortOrder] = sort.split(':');
 

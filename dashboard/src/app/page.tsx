@@ -5,7 +5,7 @@ import { ArrowRight, MapPin, Building2, ExternalLink } from 'lucide-react';
 
 export default async function DashboardHome() {
   const recentLeads = await prisma.lead.findMany({
-    orderBy: { savedAt: 'desc' },
+    orderBy: { saved_at: 'desc' },
     take: 6,
   });
 
@@ -34,7 +34,7 @@ export default async function DashboardHome() {
                   <div className="relative shrink-0">
                     <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-md group-hover:bg-blue-500/40 transition-all"></div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={lead.photoUrl || 'https://via.placeholder.com/150'} alt={lead.name} className="w-16 h-16 rounded-full border-2 border-[#1e2d45] object-cover relative z-10" />
+                    <img src={lead.profile_image || 'https://via.placeholder.com/150'} alt={lead.name} className="w-16 h-16 rounded-full border-2 border-[#1e2d45] object-cover relative z-10" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-bold text-white font-heading truncate">{lead.name}</h3>
@@ -46,9 +46,9 @@ export default async function DashboardHome() {
                            <Building2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{lead.company}</span>
                          </div>
                        )}
-                       {lead.location && (
+                       {lead.city && (
                          <div className="flex items-center gap-2 text-xs text-slate-400">
-                           <MapPin className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{lead.location}</span>
+                           <MapPin className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{lead.city}</span>
                          </div>
                        )}
                     </div>
@@ -65,8 +65,8 @@ export default async function DashboardHome() {
                     {lead.status}
                   </span>
                   
-                  {lead.profileUrl && (
-                    <a href={lead.profileUrl} target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-white transition-colors" title="Open LinkedIn">
+                  {lead.linkedin_url && (
+                    <a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-white transition-colors" title="Open LinkedIn">
                       <ExternalLink className="w-4 h-4" />
                     </a>
                   )}

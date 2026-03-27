@@ -26,7 +26,7 @@ export default async function LeadsPage({
 
   const leads = await prisma.lead.findMany({
     where,
-    orderBy: { savedAt: 'desc' },
+    orderBy: { saved_at: 'desc' },
   });
 
   return (
@@ -97,15 +97,17 @@ export default async function LeadsPage({
                   <td className="px-6 py-4 text-sm text-slate-300">{lead.company || '-'}</td>
                   <td className="px-6 py-4 text-sm text-slate-300">{lead.email || '-'}</td>
                   <td className="px-6 py-4 text-sm text-slate-300">{lead.phone || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-300">{lead.location || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-300">{lead.city || '-'}</td>
                   <td className="px-6 py-4 text-sm text-slate-300 max-w-[200px] truncate">{lead.designation || '-'}</td>
                   <td className="px-6 py-4 text-sm text-slate-400 whitespace-nowrap">
-                    {format(new Date(lead.savedAt), 'MMM dd, yyyy')}
+                    {format(new Date(lead.saved_at), 'MMM dd, yyyy')}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link href={`/leads/${lead.id}`} className="inline-flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
-                      <MoreHorizontal className="w-5 h-5" />
-                    </Link>
+                    <div className="flex items-center justify-end gap-2">
+                      <button className="text-sm font-medium text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 rounded transition-colors">Edit</button>
+                      <button className="text-sm font-medium text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded transition-colors" onClick={() => fetch(`/api/leads/${lead.id}`, {method: 'DELETE'}).then(()=>window.location.reload())}>Delete</button>
+                      <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">View</Link>
+                    </div>
                   </td>
                 </tr>
               ))}

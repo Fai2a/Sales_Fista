@@ -13,13 +13,14 @@ model Lead {
   designation     String?
   company         String?
   location        String?
+  city            String?
   email           String?
   phone           String?
-  profileUrl      String?
-  photoUrl        String?
+  linkedin_url    String?
+  profile_image   String?
   bio             String?
   connectionCount String?
-  savedAt         DateTime @default(now())
+  saved_at        DateTime @default(now())
   notes           String?
   tags            String   @default("[]") // Store as JSON string array
   status          String   @default("NEW") // Built-in statuses: NEW, CONTACTED, QUALIFIED, REJECTED

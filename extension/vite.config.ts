@@ -3,6 +3,8 @@ import { resolve } from 'path';
 
 export default defineConfig({
   build: {
+    emptyOutDir: true,
+    outDir: 'dist',
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'src/popup.html'),
@@ -10,9 +12,9 @@ export default defineConfig({
         content: resolve(__dirname, 'src/content.ts'),
       },
       output: {
-        entryFileNames: 'src/[name].js', // Next to original source names to avoid conflicts if needed, or just root
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]'
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]',
       }
     }
   }

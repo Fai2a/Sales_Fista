@@ -28,14 +28,14 @@ export default async function AnalyticsPage() {
   ];
 
   const locationsData = await prisma.lead.groupBy({
-    by: ['location'],
+    by: ['city'],
     _count: { id: true },
     orderBy: { _count: { id: 'desc' } },
     take: 5
   });
 
-  const locations = locationsData.filter(l => l.location).map(l => ({
-    name: l.location || 'Unknown',
+  const locations = locationsData.filter(l => l.city).map(l => ({
+    name: l.city || 'Unknown',
     value: l._count.id
   }));
 

@@ -3,14 +3,15 @@ export interface LeadData {
   designation: string;
   company: string;
   location: string;
+  city: string;
   email?: string;
   phone?: string;
-  profileUrl: string;
-  photoUrl: string;
+  linkedin_url: string;
+  profile_image: string;
   connectionCount: string;
   bio: string;
 }
 
 export interface ExtensionMessage {
-  action: 'SCRAPE_PROFILE' | 'SCRAPE_CONTACT_INFO';
+  action: 'SCRAPE_PROFILE' | 'SCRAPE_CONTACT_INFO' | 'EXTRACT_EMAIL' | 'EXTRACT_PHONE';
 }

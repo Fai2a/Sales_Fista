@@ -1,5 +1,19 @@
 # LeadVault: LinkedIn Lead Management System
 
+## 🚀 How to Load the Chrome Extension (IMPORTANT)
+This project uses **TypeScript** and **Tailwind CSS**. Chrome cannot run the source files (`.ts`, `@tailwind`) directly. You must load the **compiled** files from the `dist` folder.
+
+1.  Open your terminal in the `extension` directory.
+2.  Run **`npm run build`** (this converts all `.ts` to `.js` and prepares the `dist` folder).
+3.  Open Chrome and go to `chrome://extensions/`.
+4.  Enable **"Developer mode"** (top right).
+5.  Click **"Load unpacked"**.
+6.  Select the **`extension/dist`** folder.
+
+**Note on Background Script:** Even though you see `background.ts` in your source code, the manifest correctly points to `background.js` inside the `dist` folder. This is standard for modern TypeScript extensions!
+
+---
+
 A premium, full-stack solution for scraping LinkedIn profiles and managing leads in a lavish dashboard.
 
 ## 🚀 Getting Started

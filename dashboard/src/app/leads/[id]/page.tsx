@@ -24,7 +24,7 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
             <div className="relative group">
               <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-500 to-gold opacity-20 blur-xl group-hover:opacity-40 transition-opacity"></div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={lead.photoUrl || 'https://via.placeholder.com/200'} alt={lead.name} className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-[#0f1623] shadow-2xl relative z-10 object-cover" />
+              <img src={lead.profile_image || 'https://via.placeholder.com/200'} alt={lead.name} className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-[#0f1623] shadow-2xl relative z-10 object-cover" />
             </div>
             <div>
               <h1 className="text-3xl md:text-5xl font-bold text-white font-heading tracking-tight mb-2">{lead.name}</h1>
@@ -33,10 +33,10 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
                 {lead.company && (
                   <span className="flex items-center gap-1.5"><Briefcase className="w-4 h-4" /> {lead.company}</span>
                 )}
-                {lead.location && (
-                  <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {lead.location}</span>
+                {lead.city && (
+                  <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {lead.city}</span>
                 )}
-                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Added {format(new Date(lead.savedAt), 'MMM dd, yyyy')}</span>
+                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Added {format(new Date(lead.saved_at), 'MMM dd, yyyy')}</span>
               </div>
             </div>
           </div>
@@ -61,8 +61,8 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
                 </div>
              </div>
 
-             {lead.profileUrl && (
-               <a href={lead.profileUrl} target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-[0_0_15px_rgba(37,99,235,0.4)]" title="View LinkedIn Profile">
+             {lead.linkedin_url && (
+               <a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-[0_0_15px_rgba(37,99,235,0.4)]" title="View LinkedIn Profile">
                  <ExternalLink className="w-5 h-5" />
                </a>
              )}

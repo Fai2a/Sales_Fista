@@ -8,6 +8,8 @@ const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
 const viewDashboardBtn = document.getElementById('view-dashboard-btn') as HTMLButtonElement;
 const emailBtn = document.getElementById('access-email-btn') as HTMLButtonElement;
 const phoneBtn = document.getElementById('access-phone-btn') as HTMLButtonElement;
+const emailResult = document.getElementById('email-result') as HTMLDivElement;
+const phoneResult = document.getElementById('phone-result') as HTMLDivElement;
 const toast = document.getElementById('toast') as HTMLDivElement;
 
 let scrapedLeadData: LeadData | null = null;
@@ -36,7 +38,7 @@ function renderLeadCard(data: LeadData) {
     <div class="glass-card w-full p-3 flex flex-col items-center animate-[fade-in_0.3s_ease-out]">
       <div class="relative mb-2">
         <div class="absolute inset-0 rounded-full bg-gold/50 blur-md scale-110 animate-pulse"></div>
-        <img src="${data.photoUrl || 'https://via.placeholder.com/150'}" alt="Profile" class="w-20 h-20 rounded-full border-2 border-gold relative z-10 object-cover" />
+        <img src="${data.profile_image || 'https://via.placeholder.com/150'}" alt="Profile" class="w-20 h-20 rounded-full border-2 border-gold relative z-10 object-cover" />
       </div>
       <h2 class="font-heading text-lg font-bold text-white text-center leading-tight mb-1">${data.name}</h2>
       <p class="text-xs text-blue-400 font-medium text-center mb-1">${data.designation}</p>
@@ -60,17 +62,17 @@ function renderLeadCard(data: LeadData) {
   contentArea.classList.replace('opacity-0', 'opacity-100');
   actionArea.classList.remove('hidden');
 
-  // Disable buttons if already accessed
-  if (data.email) {
-    emailBtn.disabled = true;
-    emailBtn.className = "w-full px-3 py-2 rounded-lg text-xs font-bold text-slate-400 bg-slate-800 border border-slate-700 cursor-not-allowed flex items-center justify-center gap-1";
-    emailBtn.innerHTML = `✓ Email Found`;
-  }
-  if (data.phone) {
-    phoneBtn.disabled = true;
-    phoneBtn.className = "w-full px-3 py-2 rounded-lg text-xs font-bold text-slate-400 bg-slate-800 border border-slate-700 cursor-not-allowed flex items-center justify-center gap-1";
-    phoneBtn.innerHTML = `✓ Phone Found`;
-  }
+  // Use local storage to restore state if previously extracted on this profile session
+  chrome.storage.local.get(['scraped_email', 'scraped_phone'], (res) => {
+    if (res.scraped_email) {
+      if (scrapedLeadData) scrapedLeadData.email = res.scraped_email as string;
+      emailResult.textContent = `Email: ${res.scraped_email}`;
+    }
+    if (res.scraped_phone) {
+      if (scrapedLeadData) scrapedLeadData.phone = res.scraped_phone as string;
+      phoneResult.textContent = `Phone: ${res.scraped_phone}`;
+    }
+  });
 }
 
 function renderErrorState() {
@@ -89,41 +91,56 @@ function renderErrorState() {
   contentArea.classList.replace('opacity-0', 'opacity-100');
 }
 
-async function fetchContactInfo() {
+async function extractEmail() {
   if (!currentTabId) return;
+  const originalHtml = emailBtn.innerHTML;
   emailBtn.innerHTML = `<svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Accessing...`;
-  phoneBtn.innerHTML = `<svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Accessing...`;
   
-  chrome.tabs.sendMessage(currentTabId, { action: 'SCRAPE_CONTACT_INFO' }, (response: any) => {
-    if (response && response.data) {
-      if (scrapedLeadData) {
-        scrapedLeadData.email = response.data.email || scrapedLeadData.email;
-        scrapedLeadData.phone = response.data.phone || scrapedLeadData.phone;
-        renderLeadCard(scrapedLeadData);
-        showToast('Contact info accessed successfully!');
-      }
+  chrome.tabs.sendMessage(currentTabId, { action: 'EXTRACT_EMAIL' }, (response: any) => {
+    emailBtn.innerHTML = originalHtml;
+    if (response && response.success && response.data) {
+      if (scrapedLeadData) scrapedLeadData.email = response.data;
+      emailResult.textContent = `Email: ${response.data}`;
+      showToast('Email accessed successfully!');
     } else {
-      showToast('Contact info not found or visible.', true);
-      // reset text
-      if (!scrapedLeadData?.email) emailBtn.innerHTML = `Access Email`;
-      if (!scrapedLeadData?.phone) phoneBtn.innerHTML = `Access Phone`;
+      emailResult.textContent = `Email: Not available`;
     }
   });
 }
 
-emailBtn.addEventListener('click', fetchContactInfo);
-phoneBtn.addEventListener('click', fetchContactInfo);
+async function extractPhone() {
+  if (!currentTabId) return;
+  const originalHtml = phoneBtn.innerHTML;
+  phoneBtn.innerHTML = `<svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Accessing...`;
+  
+  chrome.tabs.sendMessage(currentTabId, { action: 'EXTRACT_PHONE' }, (response: any) => {
+    phoneBtn.innerHTML = originalHtml;
+    if (response && response.success && response.data) {
+      if (scrapedLeadData) scrapedLeadData.phone = response.data;
+      phoneResult.textContent = `Phone: ${response.data}`;
+      showToast('Phone accessed successfully!');
+    } else {
+      phoneResult.textContent = `Phone: Not available`;
+    }
+  });
+}
+
+emailBtn.addEventListener('click', extractEmail);
+phoneBtn.addEventListener('click', extractPhone);
 
 async function init() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   currentTabId = tab.id || null;
   
+  // Clear stale cached contact info before scraping a fresh profile
+  chrome.storage.local.remove(['scraped_email', 'scraped_phone']);
+
   if (tab.url?.includes('linkedin.com/in/')) {
     chrome.tabs.sendMessage(tab.id!, { action: 'SCRAPE_PROFILE' }, (response: any) => {
       if (chrome.runtime.lastError) {
         chrome.scripting.executeScript({
           target: { tabId: tab.id! },
-          files: ['src/content.js']
+          files: ['content.js']
         }).then(() => {
           setTimeout(() => {
             chrome.tabs.sendMessage(tab.id!, { action: 'SCRAPE_PROFILE' }, (retryResponse: any) => {
@@ -150,27 +167,16 @@ saveBtn.addEventListener('click', async () => {
   saveBtn.innerHTML = `<div class="relative px-4 py-3 bg-gradient-to-r from-gold to-yellow-500 rounded-md transition-all"><span class="flex items-center justify-center gap-2 text-base font-bold text-navy"><svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...</span></div>`;
   saveBtn.disabled = true;
 
-  try {
-    const res = await fetch(`${DASHBOARD_URL}/api/leads`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(scrapedLeadData)
-    });
-
-    if (res.ok) {
-      showToast('Lead saved to Vault successfully!');
-    } else {
-      const err = await res.json();
-      showToast(err.error || 'Failed to save lead', true);
-    }
-  } catch (error: any) {
-    showToast('Network error: Is dashboard running?', true);
-  } finally {
+  chrome.runtime.sendMessage({ action: 'SAVE_LEAD', data: scrapedLeadData }, (response: any) => {
     saveBtn.innerHTML = originalHtml;
     saveBtn.disabled = false;
-  }
+
+    if (response && response.success) {
+      showToast('Lead saved to Vault successfully!');
+    } else {
+      showToast(response?.error || 'Failed to save lead', true);
+    }
+  });
 });
 
 viewDashboardBtn.addEventListener('click', () => {

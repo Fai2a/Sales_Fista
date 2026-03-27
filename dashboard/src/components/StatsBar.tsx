@@ -6,7 +6,7 @@ export async function StatsBar() {
     prisma.lead.count(),
     prisma.lead.count({
       where: {
-        savedAt: {
+        saved_at: {
           gte: new Date(new Date().setHours(0, 0, 0, 0)),
         },
       },
