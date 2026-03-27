@@ -20,6 +20,7 @@ model Lead {
   profile_image   String?
   bio             String?
   connectionCount String?
+  skills          String   @default("[]") // Store as JSON string array
   saved_at        DateTime @default(now())
   notes           String?
   tags            String   @default("[]") // Store as JSON string array

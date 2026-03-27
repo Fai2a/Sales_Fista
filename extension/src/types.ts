@@ -10,6 +10,7 @@ export interface LeadData {
   profile_image: string;
   connectionCount: string;
   bio: string;
+  skills: string[];
 }
 
 export interface ExtensionMessage {

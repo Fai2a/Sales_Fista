@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Search, Filter, MoreHorizontal, FileDown, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { StatusFilter } from '@/components/StatusFilter';
+import { DeleteLeadButton } from '@/components/DeleteLeadButton';
 
 export default async function LeadsPage({
   searchParams,
@@ -105,7 +106,7 @@ export default async function LeadsPage({
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button className="text-sm font-medium text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 rounded transition-colors">Edit</button>
-                      <button className="text-sm font-medium text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 rounded transition-colors" onClick={() => fetch(`/api/leads/${lead.id}`, {method: 'DELETE'}).then(()=>window.location.reload())}>Delete</button>
+                      <DeleteLeadButton leadId={lead.id} />
                       <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">View</Link>
                     </div>
                   </td>

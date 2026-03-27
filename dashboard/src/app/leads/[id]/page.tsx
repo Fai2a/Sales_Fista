@@ -1,8 +1,9 @@
 import prisma from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Briefcase, MapPin, Mail, Phone, ExternalLink, Calendar, Users, Edit3, Trash2 } from 'lucide-react';
+import { ArrowLeft, Briefcase, MapPin, Mail, Phone, ExternalLink, Calendar, Users, Edit3, Trash2, Award } from 'lucide-react';
 import { format } from 'date-fns';
+import { StatusUpdater } from '@/components/StatusUpdater';
 
 export default async function LeadDetailPage({ params }: { params: { id: string } }) {
   const lead = await prisma.lead.findUnique({
@@ -12,6 +13,8 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
   if (!lead) {
     notFound();
   }
+
+  const skills = JSON.parse(lead.skills || '[]');
 
   return (
     <div className="animate-[fade-in_0.5s_ease-out] max-w-5xl mx-auto">
@@ -41,26 +44,8 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-             <div className="relative border border-[#1e2d45] rounded-xl bg-slate-900/50 flex">
-                <select 
-                  className={`appearance-none bg-transparent py-2.5 pl-4 pr-10 text-sm font-bold uppercase tracking-wider focus:outline-none cursor-pointer rounded-xl transition-colors ${
-                    lead.status === 'NEW' ? 'text-blue-400' :
-                    lead.status === 'CONTACTED' ? 'text-yellow-400' :
-                    lead.status === 'QUALIFIED' ? 'text-green-400' : 'text-red-400'
-                  }`}
-                  defaultValue={lead.status}
-                >
-                  <option value="NEW" className="bg-slate-900 text-blue-400">New</option>
-                  <option value="CONTACTED" className="bg-slate-900 text-yellow-400">Contacted</option>
-                  <option value="QUALIFIED" className="bg-slate-900 text-green-400">Qualified</option>
-                  <option value="REJECTED" className="bg-slate-900 text-red-400">Rejected</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
-                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </div>
-             </div>
-
+           <div className="flex items-center gap-3 shrink-0">
+             <StatusUpdater leadId={lead.id} initialStatus={lead.status} />
              {lead.linkedin_url && (
                <a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer" className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-[0_0_15px_rgba(37,99,235,0.4)]" title="View LinkedIn Profile">
                  <ExternalLink className="w-5 h-5" />
@@ -83,6 +68,24 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
               {lead.bio || <span className="text-slate-500 italic">No bio provided.</span>}
             </p>
           </section>
+
+          {skills.length > 0 && (
+            <section className="bg-[#0f1623]/80 backdrop-blur-md border border-[#1e2d45] rounded-2xl p-8 shadow-xl">
+              <h2 className="text-xl font-bold text-white font-heading mb-6 flex items-center gap-2">
+                <span className="w-8 h-px bg-gold/50"></span> Top Skills
+              </h2>
+              <div className="flex flex-wrap gap-2.5">
+                {skills.map((skill: string, idx: number) => (
+                  <span 
+                    key={idx} 
+                    className="px-4 py-1.5 bg-slate-800/60 text-sm font-medium text-slate-200 rounded-xl border border-[#1e2d45] hover:border-gold/30 hover:bg-slate-800 transition-all flex items-center gap-2"
+                  >
+                    <Award className="w-3.5 h-3.5 text-gold/70" /> {skill}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="bg-[#0f1623]/80 backdrop-blur-md border border-[#1e2d45] rounded-2xl p-8 shadow-xl">
              <div className="flex items-center justify-between mb-6">

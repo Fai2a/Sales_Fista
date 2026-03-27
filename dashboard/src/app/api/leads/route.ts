@@ -20,6 +20,7 @@ export async function POST(req: Request) {
         profile_image: data.profile_image,
         bio: data.bio,
         connectionCount: data.connectionCount,
+        skills: JSON.stringify(data.skills || []),
       }
     });
 
