@@ -34,15 +34,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function fetchLinkedInProfile(linkedinUrl: string) {
   const key = RAPIDAPI_KEY;
-  if (!key || key.includes('PASTE_YOUR')) {
+  if (!key || key.includes('PASTE_YOUR') || key.includes('ENCRYPTION_KEY') || key.startsWith('[')) {
     throw new Error('NO_API_KEY');
   }
 
-  // Clean the URL (remove query params/fragments)
+  // Clean the URL and extract username
+  // URL format: https://www.linkedin.com/in/username/
   const cleanUrl = linkedinUrl.split('?')[0].replace(/\/$/, '');
+  const username = cleanUrl.split('/in/')[1];
 
+  if (!username) {
+    throw new Error('API_ERROR: Could not parse username from LinkedIn URL');
+  }
+
+  // Calling the correct endpoint for fresh-linkedin-scraper-api
   const response = await fetch(
-    `https://${RAPIDAPI_HOST}/get-linkedin-profile?linkedin_url=${encodeURIComponent(cleanUrl)}&include_skills=false`,
+    `https://${RAPIDAPI_HOST}/api/v1/user/profile?username=${encodeURIComponent(username)}`,
     {
       method: 'GET',
       headers: {
@@ -57,6 +64,9 @@ async function fetchLinkedInProfile(linkedinUrl: string) {
     if (response.status === 403 || response.status === 401) {
       throw new Error('INVALID_API_KEY');
     }
+    if (response.status === 404) {
+      throw new Error('API_ERROR: Profile not found by this API');
+    }
     if (response.status === 429) {
       throw new Error('RATE_LIMITED');
     }
@@ -64,37 +74,59 @@ async function fetchLinkedInProfile(linkedinUrl: string) {
   }
 
   const json = await response.json();
-
-  // The API wraps the profile in a `data` field
   const profile = json.data || json;
 
-  // Parse the response into our LeadData shape
-  const name: string = profile.full_name || profile.firstName + ' ' + profile.lastName || '';
-  const designation: string = profile.headline || profile.position || '';
-  const email: string = profile.email || profile.personal_email || profile.work_email || '';
-  const phone: string =
-    (profile.phone_numbers && profile.phone_numbers[0]?.number) ||
-    profile.phone ||
-    '';
-  const location: string = profile.location || profile.country || '';
-  const company: string =
-    (profile.experiences && profile.experiences[0]?.company) ||
-    profile.current_company ||
-    '';
-  const profileImageUrl: string = profile.profile_picture_url || profile.photo_url || '';
-  const bio: string = profile.summary || '';
+  // Mapping fields based on the new API response structure
+  const name = profile.full_name || `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || '';
+  const designation = profile.headline || profile.position || '';
+  
+  // Robust Email Detection from API
+  const email = profile.email || 
+                (profile.personal_emails && profile.personal_emails[0]) ||
+                (profile.work_emails && profile.work_emails[0]) ||
+                profile.personal_email || 
+                profile.work_email || '';
+
+  // Robust Phone Detection from API
+  let phone = profile.phone || '';
+  if (!phone && profile.phone_numbers && Array.isArray(profile.phone_numbers)) {
+      phone = profile.phone_numbers[0]?.number || profile.phone_numbers[0] || '';
+  }
+  
+  // Handle Location (could be object or string)
+  let loc = profile.location || profile.country || '';
+  if (typeof loc === 'object' && loc !== null) {
+      loc = (loc as any).city || (loc as any).name || (loc as any).country || JSON.stringify(loc);
+  }
+
+  // Handle Company (could be object or string or array)
+  let comp = '';
+  const firstExp = (profile.experiences && profile.experiences[0]) || (profile.experience && profile.experience[0]);
+  
+  if (firstExp) {
+      const c = firstExp.company || firstExp.companyName;
+      comp = typeof c === 'object' ? (c.name || c.title || '') : (c || '');
+  } 
+  
+  if (!comp) {
+      const c = profile.current_company || profile.company;
+      comp = typeof c === 'object' ? (c.name || c.title || '') : (c || '');
+  }
+
+  const profileImageUrl = profile.profile_picture_url || profile.photo_url || '';
+  const bio = profile.summary || '';
 
   return {
     name,
     designation,
-    email,
-    phone,
-    location,
-    city: location,
-    company,
+    email: String(email),
+    phone: String(phone),
+    location: String(loc),
+    city: String(loc),
+    company: String(comp),
     linkedin_url: cleanUrl,
     profile_image: profileImageUrl,
-    connectionCount: String(profile.connections_count || ''),
+    connectionCount: String(profile.connections_count || profile.connections || ''),
     bio,
     skills: [],
   };

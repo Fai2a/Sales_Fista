@@ -29,28 +29,28 @@ export default async function DashboardHome() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {recentLeads.map((lead) => (
-              <div key={lead.id} className="group bg-[#0f1623]/60 backdrop-blur-sm border border-[#1e2d45] rounded-2xl p-5 hover:bg-[#151e2e]/80 transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
-                <div className="flex items-start gap-4">
-                  <div className="relative shrink-0">
-                    <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-md group-hover:bg-blue-500/40 transition-all"></div>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={lead.profile_image || 'https://via.placeholder.com/150'} alt={lead.name} className="w-16 h-16 rounded-full border-2 border-[#1e2d45] object-cover relative z-10" />
-                  </div>
+              <div key={lead.id} className="group bg-[#0f1623]/60 backdrop-blur-sm border border-[#1e2d45] rounded-2xl p-6 hover:bg-[#151e2e]/80 transition-all hover:shadow-[0_12px_40px_rgba(0,0,0,0.15)] relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/30 group-hover:bg-blue-500 transition-colors"></div>
+                <div className="flex flex-col gap-4">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-white font-heading truncate">{lead.name}</h3>
-                    <p className="text-sm text-blue-400 font-medium truncate mb-2">{lead.designation}</p>
+                    <h3 className="text-xl font-bold text-white font-heading truncate group-hover:text-blue-400 transition-colors">{lead.name}</h3>
+                    <p className="text-sm text-blue-400/80 font-semibold tracking-wide uppercase truncate mt-1">{lead.designation || 'Lead Prospect'}</p>
                     
-                    <div className="flex flex-col gap-1 mt-2">
+                    <div className="flex flex-col gap-2 mt-4">
                        {lead.company && (
-                         <div className="flex items-center gap-2 text-xs text-slate-400">
-                           <Building2 className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{lead.company}</span>
+                         <div className="flex items-center gap-2.5 text-sm text-slate-400">
+                           <div className="p-1.5 rounded-lg bg-slate-800/50 border border-[#1e2d45]">
+                             <Building2 className="w-3.5 h-3.5 shrink-0 text-slate-500" />
+                           </div>
+                           <span className="truncate font-medium">{lead.company}</span>
                          </div>
                        )}
-                       {lead.city && (
-                         <div className="flex items-center gap-2 text-xs text-slate-400">
-                           <MapPin className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{lead.city}</span>
+                       <div className="flex items-center gap-2.5 text-sm text-slate-400">
+                         <div className="p-1.5 rounded-lg bg-slate-800/50 border border-[#1e2d45]">
+                           <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-500" />
                          </div>
-                       )}
+                         <span className="truncate font-medium">{lead.city || lead.location || 'Unknown Location'}</span>
+                       </div>
                     </div>
                   </div>
                 </div>

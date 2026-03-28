@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
 import Link from 'next/link';
-import { Search, Filter, MoreHorizontal, FileDown, Plus } from 'lucide-react';
+import { Search, Filter, FileDown, Plus, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { StatusFilter } from '@/components/StatusFilter';
 import { DeleteLeadButton } from '@/components/DeleteLeadButton';
@@ -13,7 +13,7 @@ export default async function LeadsPage({
   const query = searchParams?.q || '';
   const statusFilter = searchParams?.status || '';
 
-  const where: any = {};
+  const where: Record<string, unknown> = {};
   if (query) {
     where.OR = [
       { name: { contains: query } },
@@ -26,7 +26,7 @@ export default async function LeadsPage({
   }
 
   const leads = await prisma.lead.findMany({
-    where,
+    where: where as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     orderBy: { saved_at: 'desc' },
   });
 
@@ -75,31 +75,36 @@ export default async function LeadsPage({
               <tr className="border-b border-[#1e2d45] bg-slate-900/50 text-xs uppercase tracking-wider text-slate-500 font-bold">
                 <th className="px-6 py-4">Name</th>
                 <th className="px-6 py-4">Company</th>
+                <th className="px-6 py-4">Location</th>
+                <th className="px-6 py-4">Designation</th>
                 <th className="px-6 py-4">Email</th>
                 <th className="px-6 py-4">Phone</th>
-                <th className="px-6 py-4">City</th>
-                <th className="px-6 py-4">Designation</th>
                 <th className="px-6 py-4">Saved</th>
                 <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e2d45]/50">
-              {leads.map((lead, index) => (
+              {leads.map((lead: any, index: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                 <tr 
                   key={lead.id} 
                   className="hover:bg-blue-500/5 transition-colors group"
                   style={{ animationDelay: `${index * 50}ms`, animation: 'fade-in-up 0.5s ease-out forwards', opacity: 0 }}
                 >
                   <td className="px-6 py-4">
-                    <Link href={`/leads/${lead.id}`} className="font-bold text-white hover:text-blue-400 text-sm transition-colors">
+                    <Link href={`/leads/${lead.id}`} className="font-bold text-white hover:text-blue-400 text-sm transition-colors block">
                       {lead.name}
                     </Link>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-300">{lead.company || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-300">{lead.email || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-300">{lead.phone || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-300">{lead.city || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-300 max-w-[200px] truncate">{lead.designation || '-'}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-slate-300">{lead.company || <span className="text-slate-600">—</span>}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3 h-3 text-slate-600" />
+                      <span className="truncate max-w-[150px]">{lead.city || lead.location || '—'}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-300 italic max-w-[180px] truncate">{lead.designation || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400">{lead.email || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400">{lead.phone || '—'}</td>
                   <td className="px-6 py-4 text-sm text-slate-400 whitespace-nowrap">
                     {format(new Date(lead.saved_at), 'MMM dd, yyyy')}
                   </td>
@@ -115,7 +120,7 @@ export default async function LeadsPage({
 
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                        <Search className="w-8 h-8 text-slate-600 mb-2" />
                        <p className="font-medium text-slate-300">No leads found</p>

@@ -22,25 +22,19 @@ export default async function LeadDetailPage({ params }: { params: { id: string 
         <Link href="/leads" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium mb-6">
           <ArrowLeft className="w-4 h-4" /> Back to Leads
         </Link>
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <div className="relative group">
-              <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-500 to-gold opacity-20 blur-xl group-hover:opacity-40 transition-opacity"></div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={lead.profile_image || 'https://via.placeholder.com/200'} alt={lead.name} className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-[#0f1623] shadow-2xl relative z-10 object-cover" />
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-5xl font-bold text-white font-heading tracking-tight mb-2">{lead.name}</h1>
-              <p className="text-xl text-blue-400 font-medium mb-3">{lead.designation}</p>
-              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
-                {lead.company && (
-                  <span className="flex items-center gap-1.5"><Briefcase className="w-4 h-4" /> {lead.company}</span>
-                )}
-                {lead.city && (
-                  <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {lead.city}</span>
-                )}
-                <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Added {format(new Date(lead.saved_at), 'MMM dd, yyyy')}</span>
-              </div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#0f1623]/40 backdrop-blur-md border border-[#1e2d45] rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-2 h-full bg-gold/30"></div>
+          <div className="flex-1">
+            <h1 className="text-4xl md:text-6xl font-bold text-white font-heading tracking-tight mb-3 group-hover:text-gold transition-colors">{lead.name}</h1>
+            <p className="text-xl md:text-2xl text-blue-400 font-semibold mb-5 tracking-tight">{lead.designation}</p>
+            <div className="flex flex-wrap items-center gap-6 text-sm text-slate-400">
+              {lead.company && (
+                <span className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-xl border border-[#1e2d45]"><Briefcase className="w-4 h-4 text-slate-500" /> {lead.company}</span>
+              )}
+              {(lead.city || lead.location) && (
+                <span className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-xl border border-[#1e2d45]"><MapPin className="w-4 h-4 text-slate-500" /> {lead.city || lead.location}</span>
+              )}
+              <span className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-xl border border-[#1e2d45]"><Calendar className="w-4 h-4 text-slate-500" /> Added {format(new Date(lead.saved_at), 'MMM dd, yyyy')}</span>
             </div>
           </div>
 

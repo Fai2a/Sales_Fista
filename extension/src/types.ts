@@ -14,5 +14,5 @@ export interface LeadData {
 }
 
 export interface ExtensionMessage {
-  action: 'SCRAPE_PROFILE' | 'SCRAPE_CONTACT_INFO' | 'EXTRACT_EMAIL' | 'EXTRACT_PHONE';
+  action: 'SCRAPE_PROFILE' | 'SCRAPE_CONTACT_INFO' | 'EXTRACT_EMAIL' | 'EXTRACT_PHONE' | 'PING';
 }

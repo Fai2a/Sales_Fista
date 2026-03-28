@@ -1,4 +1,4 @@
-import { BarChart3, TrendingUp, Users, Target, ArrowUpRight } from 'lucide-react';
+import { BarChart3, Users, Target } from 'lucide-react';
 import prisma from '@/lib/prisma';
 
 export default async function AnalyticsPage() {
@@ -11,7 +11,7 @@ export default async function AnalyticsPage() {
   });
 
   const statusesMap: Record<string, number> = {};
-  statusGroup.forEach(s => { statusesMap[s.status] = s._count.id });
+  statusGroup.forEach((s: { status: string; _count: { id: number } }) => { statusesMap[s.status] = s._count.id });
 
   const contacted = statusesMap['CONTACTED'] || 0;
   const qualified = statusesMap['QUALIFIED'] || 0;
@@ -34,12 +34,12 @@ export default async function AnalyticsPage() {
     take: 5
   });
 
-  const locations = locationsData.filter(l => l.city).map(l => ({
+  const locations = locationsData.filter(l => l.city).map((l: { city: string | null; _count: { id: number } }) => ({
     name: l.city || 'Unknown',
     value: l._count.id
   }));
 
-  const maxLoc = locations.length > 0 ? Math.max(...locations.map(l => l.value)) : 1;
+  const maxLoc = locations.length > 0 ? Math.max(...locations.map((l: { value: number }) => l.value)) : 1;
 
   const statuses = [
     { name: 'New', count: newLeads, color: 'bg-blue-500' },
@@ -112,7 +112,7 @@ export default async function AnalyticsPage() {
         <div className="bg-[#0f1623]/80 backdrop-blur-md border border-[#1e2d45] rounded-2xl p-6">
           <h2 className="text-xl font-bold text-white font-heading mb-6">Top Locations</h2>
           <div className="space-y-6">
-            {locations.length > 0 ? locations.map((loc, index) => {
+            {locations.length > 0 ? locations.map((loc: { name: string; value: number }, index: number) => {
               const width = Math.round((loc.value / maxLoc) * 100);
               return (
                 <div key={loc.name} className="flex items-center gap-4">

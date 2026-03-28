@@ -17,6 +17,8 @@ const errorMsg        = document.getElementById('error-msg')          as HTMLEle
 const actionArea      = document.getElementById('action-area')        as HTMLElement;
 const saveBtn         = document.getElementById('save-btn')           as HTMLButtonElement;
 const viewDashBtn     = document.getElementById('view-dashboard-btn') as HTMLButtonElement;
+const accessEmailBtn  = document.getElementById('access-email-btn')  as HTMLButtonElement;
+const accessPhoneBtn  = document.getElementById('access-phone-btn')  as HTMLButtonElement;
 const toast           = document.getElementById('toast')              as HTMLElement;
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -84,15 +86,45 @@ function renderErrorState(message?: string) {
   show(errorState);
 }
 
+// ── Messaging Helpers ────────────────────────────────────────────────────────
+async function ensureContentScript(tabId: number): Promise<boolean> {
+  try {
+    // Try a ping to see if content script is already there
+    await chrome.tabs.sendMessage(tabId, { action: 'PING' });
+    return true;
+  } catch (err) {
+    // If it fails, inject the script manually
+    console.log("Content script not found. Injecting manually...");
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content.js']
+      });
+      // Give it a small moment to initialize
+      await new Promise(r => setTimeout(r, 150));
+      return true;
+    } catch (e) {
+      console.error("Manual injection failed:", e);
+      return false;
+    }
+  }
+}
+
 async function init() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-
-  if (!tab.url?.includes('linkedin.com/in/')) {
+  if (!tab?.id || !tab.url?.includes('linkedin.com/in/')) {
     hide(scanState);
     if (errorMsg) errorMsg.textContent = 'Navigate to a LinkedIn profile page to scrape data.';
     show(errorState);
     setBadge('Not a Profile', 'red');
+    return;
+  }
+
+  // Ensure content script is ready before we start
+  const scriptReady = await ensureContentScript(tab.id);
+  if (!scriptReady) {
+    renderErrorState('Could not initialize scraper. Please refresh the page.');
     return;
   }
 
@@ -112,7 +144,8 @@ async function init() {
       { action: 'FETCH_LINKEDIN_PROFILE', url: linkedinUrl },
       (response: any) => {
         if (chrome.runtime.lastError) {
-          renderErrorState('Extension error. Try refreshing.');
+          console.error(chrome.runtime.lastError);
+          renderErrorState('Extension communication error. Try refreshing.');
           return;
         }
         if (response?.success && response.data) {
@@ -133,6 +166,72 @@ async function init() {
     );
 }
 
+// ── Access Email Button ───────────────────────────────────────────────────────
+accessEmailBtn.addEventListener('click', async () => {
+  const origLabel = accessEmailBtn.innerHTML;
+  accessEmailBtn.innerHTML = 'Scanning profile…';
+  accessEmailBtn.disabled = true;
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+
+  chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_EMAIL' }, (response: any) => {
+    accessEmailBtn.innerHTML = origLabel;
+    accessEmailBtn.disabled = false;
+
+    if (chrome.runtime.lastError) {
+      showToast('Connection failed. Please refresh the tab.', true);
+      return;
+    }
+
+    if (response?.success && response.data) {
+      const found = response.data as string;
+      emailText.textContent = found;
+      show(emailResult);
+      if (scrapedLeadData) scrapedLeadData.email = found;
+      showToast('Email found: ' + found);
+      accessEmailBtn.classList.add('hidden'); // Hide after success
+    } else {
+      showToast('Email not publicly available on this profile', true);
+      emailText.textContent = 'Not listed';
+      show(emailResult);
+    }
+  });
+});
+
+// ── Access Phone Button ───────────────────────────────────────────────────────
+accessPhoneBtn.addEventListener('click', async () => {
+  const origLabel = accessPhoneBtn.innerHTML;
+  accessPhoneBtn.innerHTML = 'Scanning profile…';
+  accessPhoneBtn.disabled = true;
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+
+  chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_PHONE' }, (response: any) => {
+    accessPhoneBtn.innerHTML = origLabel;
+    accessPhoneBtn.disabled = false;
+
+    if (chrome.runtime.lastError) {
+      showToast('Connection failed. Please refresh the tab.', true);
+      return;
+    }
+
+    if (response?.success && response.data) {
+      const found = response.data as string;
+      phoneText.textContent = found;
+      show(phoneResult);
+      if (scrapedLeadData) scrapedLeadData.phone = found;
+      showToast('Phone found: ' + found);
+      accessPhoneBtn.classList.add('hidden'); // Hide after success
+    } else {
+      showToast('Phone not publicly available on this profile', true);
+      phoneText.textContent = 'Not listed';
+      show(phoneResult);
+    }
+  });
+});
+
 // ── Save Lead ─────────────────────────────────────────────────────────────────
 saveBtn.addEventListener('click', async () => {
   if (!scrapedLeadData) return;
@@ -142,6 +241,10 @@ saveBtn.addEventListener('click', async () => {
   chrome.runtime.sendMessage({ action: 'SAVE_LEAD', data: scrapedLeadData }, (response: any) => {
     saveBtn.innerHTML = orig;
     saveBtn.disabled = false;
+    if (chrome.runtime.lastError) {
+        showToast('Communication error', true);
+        return;
+    }
     if (response?.success) showToast('Lead saved to Dashboard!');
     else showToast(response?.error || 'Save failed', true);
   });

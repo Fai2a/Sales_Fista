@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Zap, LayoutDashboard, Users, BarChart3, Settings } from 'lucide-react';
+import { Zap, LayoutDashboard, Users, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Sidebar() {
@@ -12,7 +12,6 @@ export function Sidebar() {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Leads', href: '/leads', icon: Users },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
   return (
@@ -48,17 +47,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="px-6 mt-auto">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/50 border border-slate-800 mt-6 cursor-pointer hover:bg-slate-800 transition-colors">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center border-2 border-[#1e2d45]">
-             <span className="text-white font-bold text-sm">JS</span>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">John Smith</p>
-            <p className="text-xs text-slate-400">Pro Plan</p>
-          </div>
-        </div>
-      </div>
+
     </aside>
   );
 }

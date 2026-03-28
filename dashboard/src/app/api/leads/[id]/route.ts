@@ -14,7 +14,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     });
 
     return NextResponse.json({ success: true }, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting lead:', error);
     return NextResponse.json({ error: 'Failed to delete lead' }, { status: 500 });
   }

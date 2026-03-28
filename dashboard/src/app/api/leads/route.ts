@@ -1,33 +1,59 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+// Handle CORS preflight from Chrome extension
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
 // POST /api/leads - Save a newly scraped lead
 export async function POST(req: Request) {
   try {
     const data = await req.json();
 
-    // Check if lead already exists based on URL or profile URL. In full app, better de-duping needed.
+    // Safety: Ensure all char fields are strings (not objects) before Prisma call
+    const fmt = (val: unknown): string => {
+      if (!val) return '';
+      if (typeof val === 'object' && val !== null) {
+        const v = val as Record<string, unknown>;
+        return String(v.city || v.name || v.country || JSON.stringify(val));
+      }
+      return String(val);
+    };
+
     const newLead = await prisma.lead.create({
       data: {
-        name: data.name,
-        company: data.company,
-        designation: data.designation,
-        location: data.location,
-        city: data.city,
-        email: data.email,
-        phone: data.phone,
-        linkedin_url: data.linkedin_url,
-        profile_image: data.profile_image,
-        bio: data.bio,
-        connectionCount: data.connectionCount,
-        skills: JSON.stringify(data.skills || []),
+        name:           fmt(data.name) || 'Unknown',
+        company:        fmt(data.company),
+        designation:    fmt(data.designation),
+        location:       fmt(data.location),
+        city:           fmt(data.city),
+        email:          fmt(data.email),
+        phone:          fmt(data.phone),
+        linkedin_url:   fmt(data.linkedin_url),
+        profile_image:  fmt(data.profile_image),
+        bio:            fmt(data.bio),
+        connectionCount:fmt(data.connectionCount),
+        skills:         typeof data.skills === 'string' ? data.skills : JSON.stringify(data.skills || []),
       }
     });
 
     return NextResponse.json({ success: true, lead: newLead }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error saving lead:', error);
-    return NextResponse.json({ error: 'Failed to save lead' }, { status: 500 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    // Log and expose the real error so it's visible in extension + server logs
+    console.error('Error saving lead:', err);
+    return NextResponse.json(
+      { error: 'Failed to save lead', detail: err?.message ?? String(error) },
+      { status: 500 }
+    );
   }
 }
 
@@ -37,11 +63,8 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('q') || '';
     const status = searchParams.get('status') || '';
-    const sort = searchParams.get('sort') || 'saved_at:desc';
 
-    const [sortField, sortOrder] = sort.split(':');
-
-    const where: any = {};
+    const where: any = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
     if (search) {
       where.OR = [
         { name: { contains: search } },
@@ -54,12 +77,12 @@ export async function GET(req: Request) {
     }
 
     const leads = await prisma.lead.findMany({
-      where,
-      orderBy: { [sortField]: sortOrder },
+      where: where as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      orderBy: { saved_at: 'desc' },
     });
 
     return NextResponse.json({ data: leads });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching leads:', error);
     return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
   }

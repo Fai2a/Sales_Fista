@@ -10,6 +10,8 @@
   ],
   "host_permissions": [
     "https://www.linkedin.com/in/*",
+    "https://fresh-linkedin-scraper-api.p.rapidapi.com/*",
+    "https://fresh-linkedin-profile-data.p.rapidapi.com/*",
     "http://localhost:3000/*"
   ],
   "action": {
