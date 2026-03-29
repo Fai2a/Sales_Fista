@@ -16,7 +16,7 @@ model Lead {
   city            String?
   email           String?
   phone           String?
-  linkedin_url    String?
+  linkedin_url    String   @unique
   profile_image   String?
   bio             String?
   connectionCount String?

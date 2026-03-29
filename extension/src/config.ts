@@ -1,12 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  LeadVault — API Configuration
-//  Paste your RapidAPI key below once, then run: npm run build
+//  RapidAPI has been removed. Data is scraped directly from
+//  LinkedIn's DOM and sent to your self-managed Next.js backend.
 // ─────────────────────────────────────────────────────────────
 
-export const RAPIDAPI_KEY = '8269bf3c2emsh0b17665d115a1e5p170da4jsn3081e2599194';
-
-export const RAPIDAPI_HOST = 'fresh-linkedin-scraper-api.p.rapidapi.com';
-
 export const DASHBOARD_API_URL = 'http://localhost:3000/api/leads';
-
-

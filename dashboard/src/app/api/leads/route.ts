@@ -13,7 +13,7 @@ export async function OPTIONS() {
   });
 }
 
-// POST /api/leads - Save a newly scraped lead
+// POST /api/leads - Save or Update a scraped lead (Upsert)
 export async function POST(req: Request) {
   try {
     const data = await req.json();
@@ -28,31 +28,48 @@ export async function POST(req: Request) {
       return String(val);
     };
 
-    const newLead = await prisma.lead.create({
-      data: {
-        name:           fmt(data.name) || 'Unknown',
-        company:        fmt(data.company),
-        designation:    fmt(data.designation),
-        location:       fmt(data.location),
-        city:           fmt(data.city),
-        email:          fmt(data.email),
-        phone:          fmt(data.phone),
-        linkedin_url:   fmt(data.linkedin_url),
-        profile_image:  fmt(data.profile_image),
-        bio:            fmt(data.bio),
-        connectionCount:fmt(data.connectionCount),
-        skills:         typeof data.skills === 'string' ? data.skills : JSON.stringify(data.skills || []),
+    const linkedinUrl = fmt(data.linkedin_url);
+    if (!linkedinUrl) {
+      return NextResponse.json({ error: 'LinkedIn URL is required for deduplication.' }, { status: 400 });
+    }
+
+    const leadData = {
+      name:           fmt(data.name) || 'Unknown',
+      company:        fmt(data.company),
+      designation:    fmt(data.designation),
+      location:       fmt(data.location),
+      city:           fmt(data.city),
+      email:          fmt(data.email),
+      phone:          fmt(data.phone),
+      profile_image:  fmt(data.profile_image),
+      bio:            fmt(data.bio),
+      connectionCount:fmt(data.connectionCount),
+      skills:         typeof data.skills === 'string' ? data.skills : JSON.stringify(data.skills || []),
+    };
+
+    // Upsert logic: If linkedin_url exists, UPDATE. If not, CREATE.
+    const lead = await prisma.lead.upsert({
+      where: { linkedin_url: linkedinUrl },
+      update: leadData,
+      create: { 
+        ...leadData,
+        linkedin_url: linkedinUrl
       }
     });
 
-    return NextResponse.json({ success: true, lead: newLead }, { status: 201 });
+    return NextResponse.json({ success: true, lead }, { 
+      status: 201,
+      headers: { 'Access-Control-Allow-Origin': '*' } 
+    });
   } catch (error: unknown) {
     const err = error as Error;
-    // Log and expose the real error so it's visible in extension + server logs
     console.error('Error saving lead:', err);
     return NextResponse.json(
       { error: 'Failed to save lead', detail: err?.message ?? String(error) },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: { 'Access-Control-Allow-Origin': '*' }
+      }
     );
   }
 }
@@ -81,9 +98,14 @@ export async function GET(req: Request) {
       orderBy: { saved_at: 'desc' },
     });
 
-    return NextResponse.json({ data: leads });
+    return NextResponse.json({ data: leads }, {
+      headers: { 'Access-Control-Allow-Origin': '*' }
+    });
   } catch (error: unknown) {
     console.error('Error fetching leads:', error);
-    return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch leads' }, { 
+      status: 500,
+      headers: { 'Access-Control-Allow-Origin': '*' }
+    });
   }
 }

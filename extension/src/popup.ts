@@ -134,36 +134,25 @@ async function init() {
   if (nameMatch && nameMatch !== 'LinkedIn') {
     scanName.textContent = nameMatch;
   }
-  if (scanLabel) scanLabel.textContent = 'Fetching profile via RapidAPI…';
+  
+  if (scanLabel) scanLabel.textContent = 'Scanning profile details…';
   show(scanState);
-  setBadge('Fetching…', 'yellow');
+  setBadge('Scraping…', 'yellow');
 
-  // Send fetch request to background
-  const linkedinUrl = tab.url!.split('?')[0];
-  chrome.runtime.sendMessage(
-      { action: 'FETCH_LINKEDIN_PROFILE', url: linkedinUrl },
-      (response: any) => {
-        if (chrome.runtime.lastError) {
-          console.error(chrome.runtime.lastError);
-          renderErrorState('Extension communication error. Try refreshing.');
-          return;
-        }
-        if (response?.success && response.data) {
-          renderLeadCard(response.data);
-        } else {
-          const err = response?.error || 'Unknown error';
-          if (err === 'NO_API_KEY') {
-            renderErrorState('API key missing. Edit src/config.ts and rebuild.');
-          } else if (err === 'INVALID_API_KEY') {
-            renderErrorState('Invalid API key. Update src/config.ts and rebuild.');
-          } else if (err === 'RATE_LIMITED') {
-            renderErrorState('Rate limit reached. Please wait before trying again.');
-          } else {
-            renderErrorState(`API error: ${err}`);
-          }
-        }
-      }
-    );
+  // Trigger DOM Scrape
+  chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_PROFILE' }, (response: any) => {
+    if (chrome.runtime.lastError) {
+      console.error(chrome.runtime.lastError);
+      renderErrorState('Extension communication error. Try refreshing.');
+      return;
+    }
+    
+    if (response?.data) {
+      renderLeadCard(response.data);
+    } else {
+      renderErrorState('Failed to extract data from page.');
+    }
+  });
 }
 
 // ── Access Email Button ───────────────────────────────────────────────────────
