@@ -1,5 +1,6 @@
 export interface LeadData {
   name: string;
+  headline: string;
   designation: string;
   company: string;
   location: string;

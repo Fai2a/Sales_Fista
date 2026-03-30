@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// Handle CORS preflight from Chrome extension
+/**
+ * ╔══════════════════════════════════════════════════════════════════╗
+ * ║ LeadVault API — Standardized Save Lead Endpoint                 ║
+ * ║ Endpoint: POST /api/save-lead                                  ║
+ * ║ Authentication: x-api-key                                      ║
+ * ╚══════════════════════════════════════════════════════════════════╝
+ */
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
     },
   });
 }
 
-// POST /api/leads - Save or Update a scraped lead (Upsert)
 export async function POST(req: Request) {
   try {
     const apiKey = req.headers.get('x-api-key');
@@ -22,8 +28,10 @@ export async function POST(req: Request) {
     }
 
     const data = await req.json();
+    
+    // Explicit Audit Log for debugging as requested
+    console.log('[LeadVault API] POST /api/save-lead | Payload:', JSON.stringify(data, null, 2));
 
-    // Safety: Ensure all char fields are strings (not objects) before Prisma call
     const fmt = (val: unknown): string => {
       if (!val) return '';
       if (typeof val === 'object' && val !== null) {
@@ -33,9 +41,24 @@ export async function POST(req: Request) {
       return String(val);
     };
 
+    // Mandatory Field: linkedin_url
     const linkedinUrl = fmt(data.linkedin_url);
     if (!linkedinUrl) {
-      return NextResponse.json({ error: 'LinkedIn URL is required for deduplication.' }, { status: 400 });
+      console.error('[LeadVault API] 400 Bad Request: Missing linkedin_url');
+      return NextResponse.json({ 
+        error: 'LinkedIn URL is required for deduplication.',
+        received: data 
+      }, { status: 400 });
+    }
+
+    // Mandatory Field: email
+    const email = fmt(data.email);
+    if (!email) {
+      console.error('[LeadVault API] 400 Bad Request: Missing email address.');
+      return NextResponse.json({ 
+        error: 'Email address is required for lead archiving.',
+        received: data 
+      }, { status: 400 });
     }
 
     const leadData = {
@@ -45,7 +68,7 @@ export async function POST(req: Request) {
       designation:    fmt(data.designation),
       location:       fmt(data.location),
       city:           fmt(data.city),
-      email:          fmt(data.email),
+      email:          email,
       phone:          fmt(data.phone),
       profile_image:  fmt(data.profile_image),
       bio:            fmt(data.bio),
@@ -53,7 +76,6 @@ export async function POST(req: Request) {
       skills:         typeof data.skills === 'string' ? data.skills : JSON.stringify(data.skills || []),
     };
 
-    // Upsert logic: If linkedin_url exists, UPDATE. If not, CREATE.
     const lead = await prisma.lead.upsert({
       where: { linkedin_url: linkedinUrl },
       update: leadData,
@@ -63,8 +85,7 @@ export async function POST(req: Request) {
       }
     });
 
-    // Log successful save for backend verification (per requirement)
-    console.log(`[LeadVault API] Lead saved: ${lead.name} (${lead.linkedin_url})`);
+    console.log(`[LeadVault API] Lead saved/updated: ${lead.name} (${lead.linkedin_url})`);
 
     return NextResponse.json({ success: true, lead }, { 
       status: 201,
@@ -74,48 +95,11 @@ export async function POST(req: Request) {
     const err = error as Error;
     console.error('Error saving lead:', err);
     return NextResponse.json(
-      { error: 'Failed to save lead', detail: err?.message ?? String(error) },
+      { error: 'Failed to save lead', detail: err?.message },
       { 
         status: 500,
         headers: { 'Access-Control-Allow-Origin': '*' }
       }
     );
-  }
-}
-
-// GET /api/leads - Get all leads with optional filtering and search
-export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const search = searchParams.get('q') || '';
-    const status = searchParams.get('status') || '';
-
-    const where: any = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { company: { contains: search } },
-        { designation: { contains: search } },
-        { headline: { contains: search } }
-      ];
-    }
-    if (status) {
-      where.status = status;
-    }
-
-    const leads = await prisma.lead.findMany({
-      where: where as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-      orderBy: { saved_at: 'desc' },
-    });
-
-    return NextResponse.json({ data: leads }, {
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    });
-  } catch (error: unknown) {
-    console.error('Error fetching leads:', error);
-    return NextResponse.json({ error: 'Failed to fetch leads' }, { 
-      status: 500,
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    });
   }
 }

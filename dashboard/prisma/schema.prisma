@@ -10,6 +10,7 @@ datasource db {
 model Lead {
   id              String   @id @default(cuid())
   name            String
+  headline        String?
   designation     String?
   company         String?
   location        String?

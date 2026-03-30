@@ -18,7 +18,8 @@ export default async function LeadsPage({
     where.OR = [
       { name: { contains: query } },
       { company: { contains: query } },
-      { designation: { contains: query } }
+      { designation: { contains: query } },
+      { headline: { contains: query } }
     ];
   }
   if (statusFilter) {
@@ -73,9 +74,10 @@ export default async function LeadsPage({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-[#1e2d45] bg-slate-900/50 text-xs uppercase tracking-wider text-slate-500 font-bold">
-                <th className="px-6 py-4">Name</th>
+                <th className="px-6 py-4">Candidate</th>
+                <th className="px-6 py-4">Headline</th>
                 <th className="px-6 py-4">Company</th>
-                <th className="px-6 py-4">Location</th>
+                <th className="px-6 py-4 text-center">Location</th>
                 <th className="px-6 py-4">Designation</th>
                 <th className="px-6 py-4">Email</th>
                 <th className="px-6 py-4">Phone</th>
@@ -91,28 +93,29 @@ export default async function LeadsPage({
                   style={{ animationDelay: `${index * 50}ms`, animation: 'fade-in-up 0.5s ease-out forwards', opacity: 0 }}
                 >
                   <td className="px-6 py-4">
-                    <Link href={`/leads/${lead.id}`} className="font-bold text-white hover:text-blue-400 text-sm transition-colors block">
+                    <Link href={`/leads/${lead.id}`} className="font-bold text-white hover:text-blue-400 text-sm transition-colors block whitespace-nowrap">
                       {lead.name}
                     </Link>
                   </td>
+                  <td className="px-6 py-4 text-sm text-slate-300 italic max-w-[180px] truncate">{lead.headline || '—'}</td>
                   <td className="px-6 py-4 text-sm font-medium text-slate-300">{lead.company || <span className="text-slate-600">—</span>}</td>
                   <td className="px-6 py-4 text-sm text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3 h-3 text-slate-600" />
-                      <span className="truncate max-w-[150px]">{lead.city || lead.location || '—'}</span>
+                    <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                      <MapPin className="w-3.5 h-3.5 text-slate-600" />
+                      <span className="truncate max-w-[140px]">{lead.city || lead.location || '—'}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-300 italic max-w-[180px] truncate">{lead.designation || '—'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-400">{lead.email || '—'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-400">{lead.phone || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400 max-w-[140px] truncate">{lead.designation || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400 max-w-[130px] truncate">{lead.email || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400 whitespace-nowrap">{lead.phone || '—'}</td>
                   <td className="px-6 py-4 text-sm text-slate-400 whitespace-nowrap">
                     {format(new Date(lead.saved_at), 'MMM dd, yyyy')}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button className="text-sm font-medium text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 rounded transition-colors">Edit</button>
+                       <Link href={`/leads/${lead.id}`} className="text-xs font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 px-2 py-1 rounded transition-colors uppercase tracking-tight">Edit</Link>
                       <DeleteLeadButton leadId={lead.id} />
-                      <Link href={`/leads/${lead.id}`} className="text-sm font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">View</Link>
+                      <Link href={`/leads/${lead.id}`} className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors uppercase tracking-tight">View</Link>
                     </div>
                   </td>
                 </tr>
@@ -120,7 +123,7 @@ export default async function LeadsPage({
 
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
                        <Search className="w-8 h-8 text-slate-600 mb-2" />
                        <p className="font-medium text-slate-300">No leads found</p>

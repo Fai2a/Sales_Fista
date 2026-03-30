@@ -1,10 +1,22 @@
 import type { LeadData } from './types';
+import { VERBOSE_LOGGING } from './config';
 
-// ── DOM Elements ─────────────────────────────────────────────────────────────
+/**
+ * LeadVault — Reactive Popup (Hardened Flow)
+ * Optimized for persistence and reliability via 'profile' key.
+ */
+
+function log(...args: any[]) { 
+  if (VERBOSE_LOGGING) console.log(`[LeadVault][${new Date().toLocaleTimeString()}]`, ...args); 
+}
+
+// ── DOM Nodes ──────────────────────────────────────────────────────────────
 const statusBadge     = document.getElementById('status-badge')       as HTMLElement;
 const profileHeader   = document.getElementById('profile-header')     as HTMLElement;
 const profileName     = document.getElementById('profile-name')       as HTMLElement;
 const profileHeadline = document.getElementById('profile-headline')   as HTMLElement;
+const profileCompany  = document.getElementById('profile-company')    as HTMLElement;
+const profileLocation = document.getElementById('profile-location')   as HTMLElement;
 const scanState       = document.getElementById('scan-state')         as HTMLElement;
 const scanName        = document.getElementById('scan-name')          as HTMLElement;
 const scanLabel       = document.getElementById('scan-label')         as HTMLElement;
@@ -21,226 +33,320 @@ const accessEmailBtn  = document.getElementById('access-email-btn')  as HTMLButt
 const accessPhoneBtn  = document.getElementById('access-phone-btn')  as HTMLButtonElement;
 const toast           = document.getElementById('toast')              as HTMLElement;
 
-// ── State ─────────────────────────────────────────────────────────────────────
+// ── State Store ──────────────────────────────────────────────────────────────
 let scrapedLeadData: LeadData | null = null;
 const DASHBOARD_URL = 'http://localhost:3000';
 
+// ── Port Management ──────────────────────────────────────────────────────────
+let port: chrome.runtime.Port | null = null;
+function connectToBackground() {
+  try {
+    port = chrome.runtime.connect({ name: 'LeadVault-Popup' });
+    port.onMessage.addListener((res) => {
+      try {
+        if (res.action === 'SAVE_LEAD_RESPONSE') {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Lead';
+          if (res.success) showToast('Lead archived to dashboard! ✓');
+          else showToast(res.error || 'Archive failed.', true);
+        }
+      } catch (err) {
+        log('Error in port message listener:', err);
+      }
+    });
+    
+    port.onDisconnect.addListener(() => { 
+      log('[LeadVault] Background port disconnected. Reconnecting...');
+      port = null; 
+      // Handle early cleanup if needed
+    });
+  } catch (err) {
+    log('Failed to connect to background worker:', err);
+  }
+}
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function show(el: HTMLElement) { el.classList.add('visible'); el.classList.remove('hidden'); }
-function hide(el: HTMLElement) { el.classList.remove('visible'); el.classList.add('hidden'); }
+function postSafeMessage(msg: any) {
+  if (!port) connectToBackground();
+  try { port?.postMessage(msg); } catch (e) { connectToBackground(); }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function show(el: HTMLElement) { el?.classList.add('visible'); el?.classList.remove('hidden'); }
+function hide(el: HTMLElement) { el?.classList.remove('visible'); el?.classList.add('hidden'); }
 
 function showToast(message: string, isError = false) {
+  if (!toast) return;
   toast.textContent = message;
   toast.className = `show ${isError ? 'error' : 'success'}`;
   setTimeout(() => { toast.className = ''; }, 3400);
 }
 
 function setBadge(text: string, color: 'green' | 'red' | 'yellow' | 'default') {
+  if (!statusBadge) return;
   statusBadge.textContent = text;
-  const colors: Record<string, string> = {
-    green:  'rgba(52,211,153,0.4)',
-    red:    'rgba(248,113,113,0.4)',
-    yellow: 'rgba(251,191,36,0.4)',
-    default:'',
-  };
-  const text_colors: Record<string, string> = {
-    green: '#34d399', red: '#f87171', yellow: '#fbbf24', default: ''
-  };
-  statusBadge.style.borderColor = colors[color];
-  statusBadge.style.color = text_colors[color];
+  const colors: Record<string, string> = { green: '#34d399', red: '#f87171', yellow: '#fbbf24', default: '' };
+  statusBadge.style.color = colors[color] || '';
+  statusBadge.style.borderColor = colors[color] ? `${colors[color]}66` : '';
 }
 
+// ── Rendering Engine ─────────────────────────────────────────────────────────
+function renderLeadCard(data: LeadData | null | undefined, duration?: string) {
+  log('UI Rendering update triggered...', data?.name || '(no data)');
+  
+  if (!data) {
+    scrapedLeadData = null;
+    hide(profileHeader);
+    hide(actionArea);
+    show(scanState);
+    if (scanLabel) scanLabel.textContent = 'Waiting for profile extraction...';
+    return;
+  }
 
-function renderLeadCard(data: LeadData) {
   scrapedLeadData = data;
-  setBadge('Profile Loaded ✓', 'green');
+  const name = data.name || 'Unknown';
+  
+  // Conditional UI States
+  if (name === 'Unknown' || name === 'Not Available') {
+    setBadge('Partial Data Found ⚠', 'yellow');
+  } else {
+    setBadge(duration ? `Synced in ${duration}s ✓` : 'Synced and Ready ✓', 'green');
+  }
 
-  profileName.textContent = data.name || '—';
-  profileHeadline.textContent = data.designation || '';
+  if (profileName) profileName.textContent = name;
+  if (profileHeadline) profileHeadline.textContent = data.headline || data.designation || 'Not Available';
+  if (profileCompany) profileCompany.textContent = data.company || 'Not Available';
+  if (profileLocation) profileLocation.textContent = data.location || 'Not Available';
+  
   show(profileHeader);
-
-  // Show email if found
-  if (data.email) {
-    emailText.textContent = data.email;
-    show(emailResult);
-  }
-
-  // Show phone if found
-  if (data.phone) {
-    phoneText.textContent = data.phone;
-    show(phoneResult);
-  }
-
   hide(scanState);
   hide(errorState);
   show(actionArea);
+
+  // Email/Phone rendering
+  if (data.email && data.email !== 'Not Available') {
+    if (emailText) emailText.textContent = data.email;
+    show(emailResult);
+    accessEmailBtn?.classList.add('hidden');
+  } else {
+    hide(emailResult);
+    accessEmailBtn?.classList.remove('hidden');
+  }
+
+  if (data.phone && data.phone !== 'Not Available') {
+    if (phoneText) phoneText.textContent = data.phone;
+    show(phoneResult);
+    accessPhoneBtn?.classList.add('hidden');
+  } else {
+    hide(phoneResult);
+    accessPhoneBtn?.classList.remove('hidden');
+  }
 }
 
-// ── Error State ───────────────────────────────────────────────────────────────
 function renderErrorState(message?: string) {
-  setBadge('Error ✗', 'red');
+  setBadge('Operation Terminated ✗', 'red');
   if (message && errorMsg) errorMsg.textContent = message;
   hide(scanState);
   hide(profileHeader);
   show(errorState);
 }
 
-// ── Messaging Helpers ────────────────────────────────────────────────────────
-async function ensureContentScript(tabId: number): Promise<boolean> {
-  try {
-    // Try a ping to see if content script is already there
-    await chrome.tabs.sendMessage(tabId, { action: 'PING' });
-    return true;
-  } catch (err) {
-    // If it fails, inject the script manually
-    console.log("Content script not found. Injecting manually...");
+// ── Scraper Management ────────────────────────────────────────────────────────
+
+async function ensureContentScriptReady(tabId: number, maxAttempts = 3): Promise<boolean> {
+  log('Ensuring content script readiness...');
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ['content.js']
+      const res = await new Promise<any>((resolve) => {
+        chrome.tabs.sendMessage(tabId, { action: 'PING' }, (r) => {
+          if (chrome.runtime.lastError) resolve(null);
+          else resolve(r);
+        });
       });
-      // Give it a small moment to initialize
-      await new Promise(r => setTimeout(r, 150));
-      return true;
-    } catch (e) {
-      console.error("Manual injection failed:", e);
-      return false;
-    }
+      if (res?.alive) return true;
+    } catch { }
+    try { await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }); } catch { }
+    await new Promise(r => setTimeout(r, 400 * attempt));
   }
+  return false;
 }
 
-async function init() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  if (!tab?.id || !tab.url?.includes('linkedin.com/in/')) {
-    hide(scanState);
-    if (errorMsg) errorMsg.textContent = 'Navigate to a LinkedIn profile page to scrape data.';
-    show(errorState);
-    setBadge('Not a Profile', 'red');
-    return;
-  }
-
-  // Ensure content script is ready before we start
-  const scriptReady = await ensureContentScript(tab.id);
-  if (!scriptReady) {
-    renderErrorState('Could not initialize scraper. Please refresh the page.');
-    return;
-  }
-
-  // Show name from tab title immediately
-  const title = tab.title || '';
-  const nameMatch = title.split('|')[0].trim().replace(/^\(\d+\)\s*/, '');
-  if (nameMatch && nameMatch !== 'LinkedIn') {
-    scanName.textContent = nameMatch;
-  }
-  
-  if (scanLabel) scanLabel.textContent = 'Scanning profile details…';
+async function triggerScrape(tabId: number, guessedName?: string) {
+  log('Triggering profile scrape...');
+  setBadge('Probing Profile…', 'yellow');
   show(scanState);
-  setBadge('Scraping…', 'yellow');
+  if (scanLabel) scanLabel.textContent = 'Loading profile data...';
 
-  // Trigger DOM Scrape
-  chrome.tabs.sendMessage(tab.id, { action: 'SCRAPE_PROFILE' }, (response: any) => {
+  const ready = await ensureContentScriptReady(tabId);
+  if (!ready) {
+    renderErrorState('Could not reach content script. Reload tab.');
+    return;
+  }
+
+  chrome.tabs.sendMessage(tabId, { action: 'SCRAPE_PROFILE' }, (res) => {
     if (chrome.runtime.lastError) {
-      console.error(chrome.runtime.lastError);
-      renderErrorState('Extension communication error. Try refreshing.');
+      log('Scrape message error:', chrome.runtime.lastError.message);
+      renderErrorState('Scraper lost connection mid-scan.');
       return;
     }
-    
-    if (response?.data) {
-      renderLeadCard(response.data);
-    } else {
-      renderErrorState('Failed to extract data from page.');
+    if (res?.success) {
+      log('Scrape success received in Popup.');
+      if (res.data.name === 'Unknown' && guessedName) res.data.name = guessedName;
+      renderLeadCard(res.data, res.duration);
     }
   });
 }
 
-// ── Access Email Button ───────────────────────────────────────────────────────
-accessEmailBtn.addEventListener('click', async () => {
-  const origLabel = accessEmailBtn.innerHTML;
-  accessEmailBtn.innerHTML = 'Scanning profile…';
+// ── Initializer ──────────────────────────────────────────────────────────────
+async function init() {
+  log('LeadVault initialized.');
+  connectToBackground();
+
+  // Reset UI and internal state immediately to prevent stale data flickers
+  scrapedLeadData = null;
+  setBadge('Probing Profile…', 'yellow');
+  show(scanState);
+  if (scanLabel) scanLabel.textContent = 'Checking for current profile...';
+  hide(profileHeader);
+  hide(actionArea);
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !tab.url?.includes('linkedin.com/in/')) {
+      renderErrorState('Extension only works on LinkedIn Profile pages.');
+      return;
+    }
+
+    // Standardized Storage Keys: 'profile' and 'active_profile_email'
+    log('Checking storage for cached profile and email...');
+    chrome.storage.local.get(['profile', 'active_profile_email'], async (result) => {
+      try {
+        // Initialize with default empty object if nothing is found to prevent null pointer errors
+        const storedLead = (result.profile || {}) as LeadData;
+        const cachedEmail = result.active_profile_email as string | undefined;
+        
+        if (storedLead?.linkedin_url && tab.url?.includes(storedLead.linkedin_url)) {
+          log('Restoring profile from storage:', storedLead.name);
+          if (cachedEmail && storedLead) {
+            log('Merging cached email into profile data.');
+            storedLead.email = cachedEmail;
+          }
+          renderLeadCard(storedLead);
+        } else {
+          log('No cached profile matching current URL. Starting new scrape...');
+          const title = tab.title || '';
+          const namePrefix = title.split('|')[0].trim().replace(/^\(\d+\)\s*/, '');
+          if (namePrefix && namePrefix !== 'LinkedIn' && scanName) scanName.textContent = namePrefix;
+          triggerScrape(tab.id!, namePrefix);
+        }
+      } catch (err) {
+        log('Error in storage callback handling:', err);
+      }
+    });
+
+    // Reactive Watcher for 'profile' key
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes.profile) return;
+      log('Storage update detected (profile key). Re-rendering UI.');
+      renderLeadCard(changes.profile.newValue as LeadData | null | undefined);
+    });
+
+  } catch (e) {
+    log('Critical failure in init:', e);
+    renderErrorState('Extension Context Error. Re-open extension.');
+  }
+}
+
+// ── UI Events ────────────────────────────────────────────────────────────────
+accessEmailBtn?.addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !scrapedLeadData) return;
   accessEmailBtn.disabled = true;
-
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return;
-
-  chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_EMAIL' }, (response: any) => {
-    accessEmailBtn.innerHTML = origLabel;
-    accessEmailBtn.disabled = false;
-
-    if (chrome.runtime.lastError) {
-      showToast('Connection failed. Please refresh the tab.', true);
-      return;
-    }
-
-    if (response?.success && response.data) {
-      const found = response.data as string;
-      emailText.textContent = found;
-      show(emailResult);
-      if (scrapedLeadData) scrapedLeadData.email = found;
-      showToast('Email found: ' + found);
-      accessEmailBtn.classList.add('hidden'); // Hide after success
-    } else {
-      showToast('Email not publicly available on this profile', true);
-      emailText.textContent = 'Not listed';
-      show(emailResult);
+  accessEmailBtn.textContent = 'Scanning...';
+  chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_EMAIL' }, (res) => {
+    try {
+      accessEmailBtn.disabled = false;
+      accessEmailBtn.textContent = 'Access Email';
+      if (chrome.runtime.lastError) {
+        showToast('Connection lost.', true);
+      } else if (res?.success && res.data) {
+        log('Email extraction success. Syncing UI and Storage.');
+        if (scrapedLeadData) {
+          scrapedLeadData.email = res.data;
+          chrome.storage.local.set({ active_profile_email: res.data });
+          renderLeadCard(scrapedLeadData);
+        } else {
+          log('Extraction success but scrapedLeadData was null. Recovering...');
+          const recovered = { email: res.data } as LeadData;
+          chrome.storage.local.set({ active_profile_email: res.data });
+          renderLeadCard(recovered);
+        }
+      } else {
+        showToast('Email not found.', true);
+      }
+    } catch (err) {
+      log('Error handling EXTRACT_EMAIL response:', err);
+      showToast('Extraction failed early.', true);
     }
   });
 });
 
-// ── Access Phone Button ───────────────────────────────────────────────────────
-accessPhoneBtn.addEventListener('click', async () => {
-  const origLabel = accessPhoneBtn.innerHTML;
-  accessPhoneBtn.innerHTML = 'Scanning profile…';
+accessPhoneBtn?.addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !scrapedLeadData) return;
   accessPhoneBtn.disabled = true;
+  accessPhoneBtn.textContent = 'Scanning...';
+  chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_PHONE' }, (res) => {
+    try {
+      accessPhoneBtn.disabled = false;
+      accessPhoneBtn.textContent = 'Access Phone';
+      if (chrome.runtime.lastError) {
+        showToast('Connection lost.', true);
+      } else if (res?.success && res.data) {
+        log('Phone extraction success. Syncing UI.');
+        if (scrapedLeadData) {
+          scrapedLeadData.phone = res.data;
+          renderLeadCard(scrapedLeadData);
+        }
+      } else {
+        showToast('Phone not found.', true);
+      }
+    } catch (err) {
+      log('Error handling EXTRACT_PHONE response:', err);
+    }
+  });
+});
 
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return;
+saveBtn?.addEventListener('click', async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!scrapedLeadData || !tab?.id) return;
+    
+    // Sanitize and fallback for mandatory linkedin_url
+    const payload = {
+      ...scrapedLeadData,
+      linkedin_url: scrapedLeadData.linkedin_url || tab.url?.split('?')[0] || '',
+      email: scrapedLeadData.email || '',
+      name: scrapedLeadData.name || 'Unknown',
+      headline: scrapedLeadData.headline || '',
+      company: scrapedLeadData.company || '',
+      designation: scrapedLeadData.designation || '',
+      location: scrapedLeadData.location || '',
+    };
 
-  chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_PHONE' }, (response: any) => {
-    accessPhoneBtn.innerHTML = origLabel;
-    accessPhoneBtn.disabled = false;
-
-    if (chrome.runtime.lastError) {
-      showToast('Connection failed. Please refresh the tab.', true);
+    if (!payload.email) {
+      showToast('Extraction required first.', true);
       return;
     }
 
-    if (response?.success && response.data) {
-      const found = response.data as string;
-      phoneText.textContent = found;
-      show(phoneResult);
-      if (scrapedLeadData) scrapedLeadData.phone = found;
-      showToast('Phone found: ' + found);
-      accessPhoneBtn.classList.add('hidden'); // Hide after success
-    } else {
-      showToast('Phone not publicly available on this profile', true);
-      phoneText.textContent = 'Not listed';
-      show(phoneResult);
-    }
-  });
+    log('Saving lead to dashboard with sanitized payload...');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Forwarding...';
+    postSafeMessage({ action: 'SAVE_LEAD', data: payload });
+  } catch (err) {
+    log('Critical error during Save Lead click:', err);
+  }
 });
 
-// ── Save Lead ─────────────────────────────────────────────────────────────────
-saveBtn.addEventListener('click', async () => {
-  if (!scrapedLeadData) return;
-  const orig = saveBtn.innerHTML;
-  saveBtn.innerHTML = 'Saving…';
-  saveBtn.disabled = true;
-  chrome.runtime.sendMessage({ action: 'SAVE_LEAD', data: scrapedLeadData }, (response: any) => {
-    saveBtn.innerHTML = orig;
-    saveBtn.disabled = false;
-    if (chrome.runtime.lastError) {
-        showToast('Communication error', true);
-        return;
-    }
-    if (response?.success) showToast('Lead saved to Dashboard!');
-    else showToast(response?.error || 'Save failed', true);
-  });
-});
-
-viewDashBtn.addEventListener('click', () => {
-  chrome.tabs.create({ url: DASHBOARD_URL });
-});
+viewDashBtn?.addEventListener('click', () => { chrome.tabs.create({ url: DASHBOARD_URL }); });
 
 document.addEventListener('DOMContentLoaded', init);
