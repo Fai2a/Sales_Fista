@@ -1,11 +1,13 @@
-import prisma from '@/lib/prisma';
+"use client";
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, Filter, FileDown, Plus, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { StatusFilter } from '@/components/StatusFilter';
 import { DeleteLeadButton } from '@/components/DeleteLeadButton';
 
-export default async function LeadsPage({
+export default function LeadsPage({
   searchParams,
 }: {
   searchParams: { q?: string; status?: string }
@@ -13,23 +15,21 @@ export default async function LeadsPage({
   const query = searchParams?.q || '';
   const statusFilter = searchParams?.status || '';
 
-  const where: Record<string, unknown> = {};
-  if (query) {
-    where.OR = [
-      { name: { contains: query } },
-      { company: { contains: query } },
-      { designation: { contains: query } },
-      { headline: { contains: query } }
-    ];
-  }
-  if (statusFilter) {
-    where.status = statusFilter;
-  }
+  const [leads, setLeads] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const leads = await prisma.lead.findMany({
-    where: where as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    orderBy: { saved_at: 'desc' },
-  });
+  useEffect(() => {
+    console.log("Fetching leads for dashboard...");
+    const params = new URLSearchParams();
+    if (query) params.append('q', query);
+    if (statusFilter) params.append('status', statusFilter);
+    
+    fetch(`/api/leads?${params.toString()}`)
+      .then(res => res.json())
+      .then(json => setLeads(json.data || []))
+      .catch(err => console.error("Error fetching dashboard leads:", err))
+      .finally(() => setIsLoading(false));
+  }, [query, statusFilter]);
 
   return (
     <div className="animate-[fade-in_0.5s_ease-out]">
@@ -86,7 +86,16 @@ export default async function LeadsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1e2d45]/50">
-              {leads.map((lead: any, index: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+              {isLoading && (
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                       <p className="text-sm font-medium">Fetching leads for dashboard...</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {!isLoading && leads.map((lead: any, index: number) => (
                 <tr 
                   key={lead.id} 
                   className="hover:bg-blue-500/5 transition-colors group"
@@ -121,7 +130,7 @@ export default async function LeadsPage({
                 </tr>
               ))}
 
-              {leads.length === 0 && (
+              {!isLoading && leads.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">

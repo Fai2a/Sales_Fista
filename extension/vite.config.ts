@@ -17,6 +17,7 @@ export default defineConfig({
         entryFileNames: '[name].js',
         chunkFileNames: '[name].js',
         assetFileNames: '[name].[ext]',
+        format: 'es', // Ensure ES format for module support
       },
     },
     outDir: resolve(__dirname, 'dist'),
@@ -31,6 +32,7 @@ export default defineConfig({
           ['public/manifest.json', 'dist/manifest.json'],
           ['public/favicon.svg',   'dist/favicon.svg'],
           ['public/icons.svg',     'dist/icons.svg'],
+          ['public/loader.js',     'dist/loader.js'],
         ];
         for (const [src, dest] of copies) {
           const abs = resolve(__dirname, src);

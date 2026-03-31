@@ -12,6 +12,7 @@ export interface LeadData {
   connectionCount: string;
   bio: string;
   skills: string[];
+  savedAt?: string;
 }
 
 export interface ExtensionMessage {

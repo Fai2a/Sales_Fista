@@ -41,8 +41,8 @@ export async function POST(req: Request) {
       return String(val);
     };
 
-    // Mandatory Field: linkedin_url
-    const linkedinUrl = fmt(data.linkedin_url);
+    // Mandatory Field: linkedin_url (Accept both snake_case and camelCase)
+    const linkedinUrl = fmt(data.linkedin_url || data.linkedinUrl);
     if (!linkedinUrl) {
       console.error('[LeadVault API] 400 Bad Request: Missing linkedin_url');
       return NextResponse.json({ 

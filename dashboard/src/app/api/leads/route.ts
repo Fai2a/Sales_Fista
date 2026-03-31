@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     // Log successful save for backend verification (per requirement)
     console.log(`[LeadVault API] Lead saved: ${lead.name} (${lead.linkedin_url})`);
 
-    return NextResponse.json({ success: true, lead }, { 
+    return NextResponse.json({ success: true, data: lead }, { 
       status: 201,
       headers: { 'Access-Control-Allow-Origin': '*' } 
     });
