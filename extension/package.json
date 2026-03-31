@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npx esbuild src/content.ts --bundle --outfile=dist/content.js --format=iife",
     "preview": "vite preview"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.38",
     "@types/node": "^25.5.0",
     "autoprefixer": "^10.4.27",
+    "esbuild": "^0.27.4",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
     "typescript": "~5.9.3",

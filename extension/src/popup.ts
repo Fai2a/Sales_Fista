@@ -1,6 +1,8 @@
 import type { LeadData } from './types';
 import { VERBOSE_LOGGING } from './config';
 
+console.log("Popup module loaded");
+
 /**
  * LeadVault — Reactive Popup (Hardened Flow v5.3)
  * Optimized for persistence and zero-latency rendering.
@@ -59,10 +61,6 @@ function connectToBackground() {
   } catch (err) { log('Background connection failed.'); }
 }
 
-function postSafeMessage(msg: any) {
-  if (!port) connectToBackground();
-  try { port?.postMessage(msg); } catch (e) { connectToBackground(); }
-}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function show(el: HTMLElement) { 
@@ -147,12 +145,33 @@ function renderLeadCard(data: Partial<LeadData> | null | undefined) {
 
 async function triggerScrape(tabId: number) {
   setBadge('Probing…', 'yellow');
-  try {
-    chrome.tabs.sendMessage(tabId, { action: 'SCRAPE_PROFILE' }, (res) => {
+  log("Sending message to tab...");
+  
+  const attemptMessage = (retryCount = 0) => {
+    chrome.tabs.sendMessage(tabId, { action: 'SCRAPE_PROFILE', type: 'SCRAPE_PROFILE' }, (res) => {
       if (chrome.runtime.lastError) {
-        setBadge('Offline', 'red');
+        log("Message failed:", chrome.runtime.lastError.message);
+        if (retryCount === 0) {
+          log("Content script not loaded. Injecting manually...");
+          chrome.scripting.executeScript({
+            target: { tabId },
+            files: ['content.js']
+          }, () => {
+            if (chrome.runtime.lastError) {
+              log("Injection failed:", chrome.runtime.lastError.message);
+              setBadge('Offline', 'red');
+            } else {
+              log("Content script loaded. Retrying...");
+              setTimeout(() => attemptMessage(1), 300);
+            }
+          });
+        } else {
+          setBadge('Offline', 'red');
+        }
         return;
       }
+      
+      log("Response:", res);
       
       if (!res?.success) {
         log(`Scrape rejected: ${res?.error}`);
@@ -167,7 +186,13 @@ async function triggerScrape(tabId: number) {
       renderLeadCard(res.data);
       setBadge('Online ✓', 'green');
     });
-  } catch (err) { setBadge('Error', 'red'); }
+  };
+
+  try {
+    attemptMessage(0);
+  } catch (err) { 
+    setBadge('Error', 'red'); 
+  }
 }
 
 // ── Initializer ──────────────────────────────────────────────────────────────
@@ -216,35 +241,61 @@ accessEmailBtn?.addEventListener('click', async () => {
   accessEmailBtn.disabled = true;
   accessEmailBtn.innerHTML = '<div class="scan-spinner"></div> Fetching email...';
 
-  chrome.tabs.sendMessage(tab.id, { action: 'EXTRACT_EMAIL' }, (res) => {
-    if (res?.success && res.data && res.data !== 'Not Available') {
-      const emailValue = res.data;
-      console.log(`Email extracted: ${emailValue}`);
-      emailText.textContent = emailValue;
-      show(emailResult);
-      accessEmailBtn.innerHTML = `Email found: ${emailValue}`;
-      accessEmailBtn.style.background = 'rgba(52,211,153,0.1)';
-      accessEmailBtn.style.borderColor = 'var(--green)';
-      accessEmailBtn.style.color = 'var(--green)';
-      
-      if (scrapedLeadData) {
-        scrapedLeadData.email = emailValue;
+  const attemptEmail = (retryCount = 0) => {
+    chrome.tabs.sendMessage(tab.id!, { action: 'EXTRACT_EMAIL' }, (res) => {
+      if (chrome.runtime.lastError) {
+        if (retryCount === 0) {
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id! },
+            files: ['content.js']
+          }, () => {
+            if (!chrome.runtime.lastError) {
+              setTimeout(() => attemptEmail(1), 300);
+            } else {
+              accessEmailBtn.innerHTML = 'Not Found';
+              accessEmailBtn.disabled = false;
+              showToast('Email not found on profile.', true);
+            }
+          });
+        } else {
+          accessEmailBtn.innerHTML = 'Not Found';
+          accessEmailBtn.disabled = false;
+          showToast('Email not found on profile.', true);
+        }
+        return;
       }
-      // Keep cache active for immediate reload
-      chrome.storage.local.get(['active_profile'], (s) => {
-        const currentActive = s.active_profile as Partial<LeadData> || {};
-        chrome.storage.local.set({ 
-          active_profile: { ...currentActive, email: emailValue } 
+
+      if (res?.success && res.data && res.data !== 'Not Available') {
+        const emailValue = res.data;
+        console.log(`Email extracted: ${emailValue}`);
+        emailText.textContent = emailValue;
+        show(emailResult);
+        accessEmailBtn.innerHTML = `Email found: ${emailValue}`;
+        accessEmailBtn.style.background = 'rgba(52,211,153,0.1)';
+        accessEmailBtn.style.borderColor = 'var(--green)';
+        accessEmailBtn.style.color = 'var(--green)';
+        
+        if (scrapedLeadData) {
+          scrapedLeadData.email = emailValue;
+        }
+        // Keep cache active for immediate reload
+        chrome.storage.local.get(['active_profile'], (s) => {
+          const currentActive = s.active_profile as Partial<LeadData> || {};
+          chrome.storage.local.set({ 
+            active_profile: { ...currentActive, email: emailValue } 
+          });
         });
-      });
-      navigator.clipboard.writeText(res.data);
-      showToast('Email extracted and copied!');
-    } else {
-      accessEmailBtn.innerHTML = 'Not Found';
-      accessEmailBtn.disabled = false;
-      showToast('Email not found on profile.', true);
-    }
-  });
+        navigator.clipboard.writeText(res.data);
+        showToast('Email extracted and copied!');
+      } else {
+        accessEmailBtn.innerHTML = 'Not Found';
+        accessEmailBtn.disabled = false;
+        showToast('Email not found on profile.', true);
+      }
+    });
+  };
+
+  attemptEmail(0);
 });
 
 accessPhoneBtn?.addEventListener('click', async () => {
@@ -281,41 +332,76 @@ saveBtn?.addEventListener('click', async () => {
   saveBtn.disabled = true;
   saveBtn.textContent = 'Archiving...';
 
-  const safeStr = (val: any) => (typeof val === 'string' && val.trim() !== '' && val !== '—') ? val : 'Not Available';
+  chrome.storage.local.get('active_profile', async (result) => {
+    const profile = (result?.active_profile || {}) as Partial<LeadData>;
+    const safeStr = (val: any) => (typeof val === 'string' && val.trim() !== '' && val !== '—') ? val : 'Not Available';
 
-  let finalName = safeStr(scrapedLeadData.name);
-  if (finalName === 'Not Available' || finalName.length < 2) {
-    console.warn("Missing required field: name (Using fallback)");
-    finalName = 'Unknown';
-  }
+    let finalName = profile.name || safeStr(scrapedLeadData!.name);
+    if (finalName === 'Not Available' || finalName.length < 2) {
+      console.warn("Missing required field: name (Using fallback)");
+      finalName = 'Unknown';
+    }
 
-  const lead = {
-    name:           finalName,
-    headline:       safeStr(scrapedLeadData.headline),
-    company:        safeStr(scrapedLeadData.company),
-    location:       safeStr(scrapedLeadData.location || scrapedLeadData.city),
-    designation:    safeStr(scrapedLeadData.designation),
-    email:          safeStr(scrapedLeadData.email),
-    phone:          safeStr(scrapedLeadData.phone),
-    linkedin_url:   scrapedLeadData.linkedin_url || tab.url?.split('?')[0] || '',
-    saved_at:       new Date().toISOString(),
-    profile_image:  scrapedLeadData.profile_image || '',
-    connectionCount:scrapedLeadData.connectionCount || '0',
-    bio:            scrapedLeadData.bio || '',
-    skills:         scrapedLeadData.skills || []
-  };
+    const lead = {
+      name: finalName,
+      headline: profile.headline || '',
+      company: profile.company || '',
+      location: profile.location || '',
+      designation: profile.designation || '',
+      email: profile.email || safeStr(scrapedLeadData!.email),
+      phone: profile.phone || safeStr(scrapedLeadData!.phone),
+      linkedin_url: profile.linkedin_url || scrapedLeadData!.linkedin_url || tab.url?.split('?')[0] || '',
+      saved_at: new Date().toISOString(),
+      profile_image: scrapedLeadData!.profile_image || '',
+      connectionCount: scrapedLeadData!.connectionCount || '0',
+      bio: scrapedLeadData!.bio || '',
+      skills: scrapedLeadData!.skills || []
+    };
 
-  if (!lead.linkedin_url) {
-    console.error('[LeadVault] Cannot save — missing required linkedin_url');
-    showToast(`Failed to save lead: Missing URL`, true);
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Save to Dashboard';
-    return;
-  }
+    if (!lead.linkedin_url) {
+      console.error('[LeadVault] Cannot save — missing required linkedin_url');
+      showToast(`Failed to save lead: Missing URL`, true);
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save to Dashboard';
+      return;
+    }
 
-  console.log("Lead to save:", lead);
-  console.log("Sending lead to backend...");
-  postSafeMessage({ action: 'SAVE_LEAD', data: lead });
+    console.log("Lead to save:", lead);
+    console.log("Sending lead to backend...");
+    try {
+      const response = await fetch("http://localhost:3000/api/leads", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": "lv-shk-sec-2024"
+        },
+        body: JSON.stringify(lead)
+      });
+      
+      const responseData = await response.json();
+      
+      if (response.ok) {
+        console.log("Lead saved successfully");
+        showToast('Lead saved successfully');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+          Save to Dashboard`;
+      } else {
+        console.error("Failed to save lead:", responseData.error || responseData.detail);
+        showToast('Failed to save lead', true);
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save to Dashboard';
+      }
+    } catch (err) {
+      console.error("Failed to save lead:", err);
+      showToast('Failed to save lead', true);
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save to Dashboard';
+    }
+  });
 });
 
 viewDashBtn?.addEventListener('click', () => { chrome.tabs.create({ url: DASHBOARD_URL }); });

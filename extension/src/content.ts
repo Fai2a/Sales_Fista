@@ -2,6 +2,8 @@ import axios from 'axios';
 import type { LeadData } from './types';
 import { DASHBOARD_API_KEY } from './config';
 
+console.log("Content script running");
+
 /**
  * LeadVault — Hardened Scraper Engine (v5.2)
  * Bulletproof DOM Scraping | Regex Contact Extraction | Async Persistence
@@ -319,14 +321,15 @@ if (!window.__LISTENER_ADDED__) {
     chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       if (!isContextValid()) return false;
 
-      log(`Incoming message: ${request.action}`);
+      console.log("Message received in content script:", request);
+      log(`Incoming message action: ${request.action || request.type}`);
 
-      if (request.action === 'PING') {
+      if (request.action === 'PING' || request.type === 'PING') {
         sendResponse({ status: 'READY', alive: true });
         return true; 
       } 
       
-      if (request.action === 'SCRAPE_PROFILE') {
+      if (request.action === 'SCRAPE_PROFILE' || request.type === 'SCRAPE_PROFILE') {
         runFullScrapePipe().then((res) => {
           if (res && res.success) {
             sendResponse({ success: true, data: res.data });

@@ -11,6 +11,7 @@ const log = (...args: any[]) =>
   console.log(`%c[LeadVault BG][${new Date().toLocaleTimeString()}]`, 'color: #3b82f6; font-weight: bold;', ...args);
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
+console.log("Background module loaded");
 
 chrome.runtime.onInstalled.addListener((details) => {
   log(`Service Worker installed (${details.reason})`);

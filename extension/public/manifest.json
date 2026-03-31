@@ -4,13 +4,14 @@
   "version": "1.0.0",
   "description": "Scrape LinkedIn profile data and save it directly to the Next.js Dashboard.",
   "permissions": [
+    "tabs",
     "activeTab",
     "scripting",
     "storage",
     "webNavigation"
   ],
   "host_permissions": [
-    "https://www.linkedin.com/in/*",
+    "https://www.linkedin.com/*",
     "https://fresh-linkedin-scraper-api.p.rapidapi.com/*",
     "https://fresh-linkedin-profile-data.p.rapidapi.com/*",
     "http://localhost:3000/*"
@@ -34,7 +35,7 @@
         "https://www.linkedin.com/*"
       ],
       "js": [
-        "loader.js"
+        "content.js"
       ],
       "run_at": "document_idle"
     }
