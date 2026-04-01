@@ -7,6 +7,19 @@ import { format } from 'date-fns';
 import { StatusFilter } from '@/components/StatusFilter';
 import { DeleteLeadButton } from '@/components/DeleteLeadButton';
 
+interface Lead {
+  id: string;
+  name: string;
+  headline?: string;
+  company?: string;
+  city?: string;
+  location?: string;
+  designation?: string;
+  email?: string;
+  phone?: string;
+  saved_at: string;
+}
+
 export default function LeadsPage({
   searchParams,
 }: {
@@ -15,7 +28,7 @@ export default function LeadsPage({
   const query = searchParams?.q || '';
   const statusFilter = searchParams?.status || '';
 
-  const [leads, setLeads] = useState<any[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -95,7 +108,7 @@ export default function LeadsPage({
                   </td>
                 </tr>
               )}
-              {!isLoading && leads.map((lead: any, index: number) => (
+              {!isLoading && leads.map((lead: Lead, index: number) => (
                 <tr 
                   key={lead.id} 
                   className="hover:bg-blue-500/5 transition-colors group"
