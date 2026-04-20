@@ -18,11 +18,6 @@ interface Lead {
   email?: string;
   phone?: string;
   saved_at: string;
-  linkedin_url?: string;
-  status?: string;
-  notes?: string;
-  connectionCount?: string;
-  skills?: string;
 }
 
 export default function LeadsPage({
@@ -49,46 +44,6 @@ export default function LeadsPage({
       .finally(() => setIsLoading(false));
   }, [query, statusFilter]);
 
-  const handleExportCSV = () => {
-    if (leads.length === 0) {
-      alert("No leads to export.");
-      return;
-    }
-
-    const headers = [
-      "Name", "Headline", "Designation", "Company", "Location", "City", 
-      "Email", "Phone", "LinkedIn URL", "Status", "Connections", "Saved At", "Notes"
-    ];
-
-    const csvRows = leads.map(lead => [
-      `"${(lead.name || "").replace(/"/g, '""')}"`,
-      `"${(lead.headline || "").replace(/"/g, '""')}"`,
-      `"${(lead.designation || "").replace(/"/g, '""')}"`,
-      `"${(lead.company || "").replace(/"/g, '""')}"`,
-      `"${(lead.location || "").replace(/"/g, '""')}"`,
-      `"${(lead.city || "").replace(/"/g, '""')}"`,
-      `"${(lead.email || "").replace(/"/g, '""')}"`,
-      `"${(lead.phone || "").replace(/"/g, '""')}"`,
-      `"${(lead.linkedin_url || "").replace(/"/g, '""')}"`,
-      `"${(lead.status || "NEW").replace(/"/g, '""')}"`,
-      `"${(lead.connectionCount || "").replace(/"/g, '""')}"`,
-      `"${new Date(lead.saved_at).toLocaleString()}"`,
-      `"${(lead.notes || "").replace(/"/g, '""')}"`
-    ].join(","));
-
-    // Add BOM (\uFEFF) to ensure Excel opens with UTF-8 encoding
-    const csvContent = "\uFEFF" + [headers.join(","), ...csvRows].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `leads_export_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="animate-[fade-in_0.5s_ease-out]">
       <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -97,10 +52,7 @@ export default function LeadsPage({
           <p className="text-slate-400">Manage, qualify, and engage your parsed LinkedIn prospects.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={handleExportCSV}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 bg-slate-800/50 hover:bg-slate-800 border border-[#1e2d45] transition-colors flex items-center gap-2"
-          >
+          <button className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 bg-slate-800/50 hover:bg-slate-800 border border-[#1e2d45] transition-colors flex items-center gap-2">
             <FileDown className="w-4 h-4" /> Export CSV
           </button>
           <button className="px-4 py-2 rounded-xl text-sm font-bold text-navy bg-gradient-to-r from-gold to-yellow-600 hover:shadow-[0_0_15px_rgba(245,158,11,0.5)] transition-all flex items-center gap-2">
