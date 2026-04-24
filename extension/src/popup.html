@@ -279,7 +279,14 @@
         <svg width="15" height="15" fill="none" stroke="#4f8ef7" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
         </svg>
-        <span id="email-text">—</span>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <span id="email-text">—</span>
+          <div id="enrichment-info" style="display: none; align-items: center; gap: 4px; font-size: 9px; opacity: 0.8;">
+            <span id="enrichment-source"></span>
+            <span id="enrichment-dot" style="opacity: 0.5;">•</span>
+            <span id="enrichment-confidence" style="padding: 1px 4px; border-radius: 4px; font-weight: 700; text-transform: uppercase;"></span>
+          </div>
+        </div>
       </div>
       <div id="phone-result" class="contact-pill">
         <svg width="15" height="15" fill="none" stroke="#34d399" stroke-width="2" viewBox="0 0 24 24">

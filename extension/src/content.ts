@@ -1,6 +1,8 @@
 import axios from 'axios';
 import type { LeadData } from './types';
 import { DASHBOARD_API_KEY } from './config';
+import { enrichProfile } from './enrichment/enrichment';
+import { extractLinkedInContactInfo } from './enrichment/contactExtractor';
 
 console.log("Content script running");
 
@@ -20,69 +22,7 @@ declare global {
 
 // ─── 1. Context Safety Guard ──────────────────────────────────────────────────
 
-function isContextValid(): boolean {
-  return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id;
-}
-
-const log = (...args: any[]) => {
-  if (!isContextValid()) return;
-  console.log(`%c[LeadVault][${new Date().toLocaleTimeString()}]`, 'color: #10b981; font-weight: bold;', ...args);
-};
-
-function safeChromeCall<T>(fn: () => T): T | null {
-  if (!isContextValid()) return null;
-  try {
-    return fn();
-  } catch (err: any) {
-    if (err.message?.includes('context invalidated')) {
-      console.warn('[LeadVault] Extension context invalidated. Cleaning up script...');
-      cleanup();
-    }
-    return null;
-  }
-}
-
-function cleanup() {
-  if (window.__NAV_WATCHER__) clearInterval(window.__NAV_WATCHER__);
-  window.__LEADVAULT_INITIALIZED__ = false;
-}
-
-// ─── 2. Core Utilities ────────────────────────────────────────────────────────
-
-const wait = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-function sanitizeField(value: string | null | undefined): string {
-  if (!value) return 'Not Available';
-  let clean = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-  if (/^\d+$/.test(clean)) return 'Not Available'; 
-  return clean || 'Not Available';
-}
-
-async function waitForElement(selector: string, timeout = 10000): Promise<HTMLElement | null> {
-  if (!isContextValid()) return null;
-  return new Promise((resolve) => {
-    const interval = 300;
-    let elapsed = 0;
-
-    const timer = setInterval(() => {
-      if (!isContextValid()) {
-        clearInterval(timer);
-        return resolve(null);
-      }
-      const el = document.querySelector(selector) as HTMLElement;
-      if (el && el.innerText && el.innerText.trim().length > 0) {
-        clearInterval(timer);
-        resolve(el);
-      }
-      
-      elapsed += interval;
-      if (elapsed >= timeout) {
-        clearInterval(timer);
-        resolve(null);
-      }
-    }, interval);
-  });
-}
+import { isContextValid, log, wait, sanitizeField, safeChromeCall, cleanup } from './content-utils';
 
 // ─── 3. Bulletproof Scraping Engine ───────────────────────────────────────────
 
@@ -90,8 +30,13 @@ async function scrapeProfile(): Promise<LeadData> {
   log('Scraping core profile fields...');
 
   // Set explicitly via runFullScrapePipe which handles primary extraction logic
-  const nameEl = document.querySelector('h1.text-heading-xlarge, .pv-text-details__left-panel h1, h1') as HTMLElement;
-  const name = 'Unknown';
+  const nameEl = (
+    document.querySelector('h1.text-heading-xlarge') || 
+    document.querySelector('.pv-text-details__left-panel h1') || 
+    document.querySelector('h1[class*="text-heading"]') ||
+    document.querySelector('[data-test-id="inline-name"]')
+  ) as HTMLElement;
+  const name = sanitizeField(nameEl?.innerText || nameEl?.textContent) || 'Unknown';
 
   // Strategy: Targeted sibling or specific class for Headline
   const headlineEl = 
@@ -124,15 +69,15 @@ async function scrapeProfile(): Promise<LeadData> {
     headline,
     company,
     location,
-    city: location.split(',')[0].trim(),
+    city: location ? location.split(',')[0].trim() : null,
     designation,
     linkedin_url: window.location.href.split('?')[0],
-    profile_image: document.querySelector('img.pv-top-card-profile-picture__image')?.getAttribute('src') || '',
+    profile_image: document.querySelector('img.pv-top-card-profile-picture__image')?.getAttribute('src') || null,
     connectionCount: '0',
     bio: '',
     skills: [],
-    email: 'Not Available',
-    phone: 'Not Available'
+    email: null,
+    phone: null
   };
 
   // Cache name and headline immediately for instant popup rendering
@@ -148,50 +93,9 @@ async function scrapeProfile(): Promise<LeadData> {
 /**
  * 4-Tier Strategy for contact extraction (Bulletproof Regex Fallback)
  */
-async function extractEmail(): Promise<string> {
-  log('Bulletproof Email Extraction Flow Initiated...');
-  try {
-    // 1. Check if contact info modal link exists and click it IF NOT already in overlay
-    if (!window.location.href.includes('/overlay/contact-info/')) {
-      const contactLink = document.querySelector('a[href*="overlay/contact-info"]') as HTMLElement;
-      if (contactLink) {
-        contactLink.click();
-        await waitForElement('.pv-contact-info, .artdeco-modal', 4000);
-        await wait(500); // Allow modal hydration
-      }
-    }
+// Note: extractEmail logic moved to contactExtractor.ts and enrichment.ts pipeline
 
-    // Strategy 1 — Direct mailto link anywhere in document
-    const mailtoLink = document.querySelector('a[href^="mailto:"]');
-    const email1 = mailtoLink?.getAttribute('href')?.replace('mailto:', '').trim();
-    if (email1) return sanitizeField(email1);
-
-    // Strategy 2 — Contact info section link text
-    const email2 = document.querySelector('.pv-contact-info__contact-type a')?.textContent?.trim();
-    if (email2 && email2.includes('@')) return sanitizeField(email2);
-
-    // Strategy 3 — Any anchor whose text contains @ symbol
-    const allLinks = Array.from(document.querySelectorAll('a'));
-    const email3 = allLinks.find(a => a.textContent?.includes('@'))?.textContent?.trim();
-    if (email3) return sanitizeField(email3);
-
-    // Strategy 4 — BROAD Regex sweep of document.body.innerText
-    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
-    const bodyText = document.body.innerText;
-    const email4 = bodyText.match(emailRegex)?.[0];
-    if (email4) return sanitizeField(email4);
-
-    return 'Not Available';
-  } catch (err) {
-    log('Extraction exception:', err);
-    return 'Not Available';
-  } finally {
-    // Auto-dismiss modal
-    (document.querySelector('button[aria-label="Dismiss"]') as HTMLElement)?.click();
-  }
-}
-
-async function extractPhone(): Promise<string> {
+async function extractPhone(): Promise<string | null> {
   log('Extracting phone from modal...');
   try {
     const phoneEl = document.querySelector('.ci-phone span.t-14') || 
@@ -199,8 +103,8 @@ async function extractPhone(): Promise<string> {
     if (phoneEl && !phoneEl.textContent?.includes('@')) {
       return sanitizeField(phoneEl.textContent);
     }
-    return 'Not Available';
-  } catch { return 'Not Available'; }
+    return null;
+  } catch { return null; }
 }
 
 // ─── 4. Pipeline Logic ───────────────────────────────────────────────────────
@@ -249,7 +153,7 @@ async function runFullScrapePipe() {
     }
 
     const testStr = sanitizeField(nameEl?.innerText || nameEl?.textContent);
-    if (testStr && testStr.length >= 2 && testStr !== 'Not Available') {
+    if (testStr && testStr.length >= 2) {
       extractedName = testStr;
       log(`Name found: ${extractedName}`);
       break;
@@ -265,18 +169,18 @@ async function runFullScrapePipe() {
     log('Failed to extract name from DOM, attempting fallbacks...');
     
     if (document.title && document.title.includes(' | LinkedIn')) {
-      const titleName = document.title.split(' | LinkedIn')[0].trim();
+      const titleName = sanitizeField(document.title.split(' | LinkedIn')[0].trim());
       if (titleName && titleName.length >= 2 && !titleName.includes('(')) { // Avoid unparsed notification counts e.g. "(12) LinkedIn"
-         extractedName = sanitizeField(titleName);
+         extractedName = titleName;
          log(`Fallback name used`);
       }
     }
     
     // Meta OG Title
     if ((extractedName === 'Unknown' || extractedName === 'Not Available') && document.querySelector('meta[property="og:title"]')) {
-      const metaContent = document.querySelector('meta[property="og:title"]')?.getAttribute('content')?.split(' | LinkedIn')[0].trim();
+      const metaContent = sanitizeField(document.querySelector('meta[property="og:title"]')?.getAttribute('content')?.split(' | LinkedIn')[0].trim());
       if (metaContent && metaContent.length >= 2) {
-         extractedName = sanitizeField(metaContent);
+         extractedName = metaContent;
          log(`Fallback name used`);
       }
     }
@@ -287,11 +191,42 @@ async function runFullScrapePipe() {
     }
   }
 
-  // Proceed cleanly down pipeline with whatever data gathered
+  // 3. Proceed cleanly down pipeline with whatever data gathered
   const leadData = await scrapeProfile();
   leadData.name = extractedName;
 
-  // 3. Store and Sync ONLY if valid
+  // Update active profile cache for popup consistency
+  safeChromeCall(() => {
+    chrome.storage.local.set({ 
+      active_profile: { name: leadData.name, headline: leadData.headline }
+    });
+  });
+
+  // 4. Unified Priority Enrichment Layer (Contact Info -> Website -> Public)
+  log('Triggering unified enrichment pipeline...');
+  try {
+    const enrichment = await enrichProfile({
+      fullName: leadData.name,
+      companyName: leadData.company || 'Unknown',
+      jobTitle: leadData.designation || 'Unknown',
+      location: leadData.location || 'Unknown',
+      linkedinUrl: leadData.linkedin_url
+    });
+
+    if (enrichment && enrichment.email) {
+      log(`Enrichment successful! Found: ${enrichment.email} via ${enrichment.source} (${enrichment.confidence})`);
+      leadData.email = enrichment.email;
+      leadData.enrichment = enrichment;
+    } else {
+      log('Enrichment pipeline returned no results. Email set to NULL.');
+      leadData.email = null;
+      leadData.enrichment = enrichment; // This will contain the null structure
+    }
+  } catch (err) {
+    log('Enrichment pipeline error:', err);
+  }
+
+  // 5. Store and Sync ONLY if valid
   safeChromeCall(() => {
     chrome.storage.local.set({ 
       profile: leadData,
@@ -300,7 +235,7 @@ async function runFullScrapePipe() {
   });
 
   try {
-    await axios.post('http://localhost:3000/api/leads', leadData, {
+    await axios.post('http://localhost:3001/api/leads', leadData, {
       headers: { 
         'Content-Type': 'application/json',
         'x-api-key': DASHBOARD_API_KEY
@@ -341,7 +276,7 @@ if (!window.__LISTENER_ADDED__) {
       } 
       
       if (request.action === 'EXTRACT_EMAIL') {
-        extractEmail().then((data) => sendResponse({ success: true, data }));
+        extractLinkedInContactInfo().then((info) => sendResponse({ success: true, data: info.email }));
         return true; // Keep channel open
       } 
       

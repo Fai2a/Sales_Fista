@@ -45,7 +45,45 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
-// ─── Lead Save Handler ────────────────────────────────────────────────────────
+// ─── 2.5 Standard Messaging Handler (v2.1) ────────────────────────────────────
+
+// ─── 4. Promise-Based Messaging (Hardened v2.3) ──────────────────────
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === "SAVE_LEAD") {
+    handleApiSave(message.payload)
+      .then(res => sendResponse(res))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true; // CRITICAL for async response in Background
+  }
+  return false;
+});
+
+async function handleApiSave(data: any) {
+  try {
+    log("Promise-based save request:", data?.slug);
+    const res = await fetch(DASHBOARD_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": DASHBOARD_API_KEY
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`API ${res.status}: ${errorText}`);
+    }
+
+    const json = await res.json();
+    return { success: true, data: json };
+
+  } catch (err: any) {
+    log("SAVE ERROR:", err.message);
+    return { success: false, error: err.message };
+  }
+}
 
 async function handleSaveLead(
   port: chrome.runtime.Port,

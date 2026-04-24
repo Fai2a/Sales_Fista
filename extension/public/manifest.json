@@ -14,7 +14,7 @@
     "https://www.linkedin.com/*",
     "https://fresh-linkedin-scraper-api.p.rapidapi.com/*",
     "https://fresh-linkedin-profile-data.p.rapidapi.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3001/*"
   ],
   "action": {
     "default_popup": "popup.html",

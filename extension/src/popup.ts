@@ -30,11 +30,14 @@ const saveBtn         = document.getElementById('save-btn')           as HTMLBut
 const viewDashBtn     = document.getElementById('view-dashboard-btn') as HTMLButtonElement;
 const accessEmailBtn  = document.getElementById('access-email-btn')  as HTMLButtonElement;
 const accessPhoneBtn  = document.getElementById('access-phone-btn')  as HTMLButtonElement;
+const enrichmentInfo  = document.getElementById('enrichment-info')   as HTMLElement;
+const enrichmentSource = document.getElementById('enrichment-source') as HTMLElement;
+const enrichmentConfidence = document.getElementById('enrichment-confidence') as HTMLElement;
 const toast           = document.getElementById('toast')              as HTMLElement;
 
 // ── State Store ──────────────────────────────────────────────────────────────
 let scrapedLeadData: LeadData | null = null;
-const DASHBOARD_URL = 'http://localhost:3000';
+const DASHBOARD_URL = 'http://localhost:3001';
 
 // ── Port Management ──────────────────────────────────────────────────────────
 let port: chrome.runtime.Port | null = null;
@@ -139,6 +142,68 @@ function renderLeadCard(data: Partial<LeadData> | null | undefined) {
   show(profileHeader);
   show(actionArea);
   scrapedLeadData = data as LeadData;
+
+  // Render enrichment if present
+  if (data.enrichment) {
+    renderEnrichment(data.enrichment);
+  }
+}
+
+function renderEnrichment(enrich: any) {
+  if (!enrich) {
+    enrichmentInfo.style.display = 'none';
+    return;
+  }
+  
+  // Use the notes or source provided by the backend
+  enrichmentSource.textContent = enrich.notes || enrich.source || 'Public Source';
+  enrichmentConfidence.textContent = enrich.confidence;
+  
+  // Confidence styling
+  const confColors: Record<string, string> = { 
+    'High': '#34d399', 
+    'Medium': '#fbbf24', 
+    'Low': '#f87171' 
+  };
+  enrichmentConfidence.style.color = confColors[enrich.confidence] || '#fff';
+  enrichmentConfidence.style.backgroundColor = `${confColors[enrich.confidence]}22` || 'transparent';
+  
+  // Display sources if present
+  if (enrich.sources && enrich.sources.length > 0) {
+    console.log("Sources found:", enrich.sources);
+    // We could add a tooltip or expand the UI to show URLs here
+  }
+
+  enrichmentInfo.style.display = 'flex';
+}
+
+async function enrichProfile(data: LeadData) {
+  if (!data.name || data.name === 'Unknown' || !data.company) {
+    log("Cannot enrich: Missing required identifiers (name/company).");
+    return null;
+  }
+
+  log("Starting data enrichment...");
+  try {
+    const response = await fetch(`${DASHBOARD_URL}/api/enrich`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: data.name,
+        company: data.company,
+        headline: data.headline || ''
+      })
+    });
+
+    const res = await response.json();
+    if (res.success) {
+      log("Enrichment response received:", res);
+      return res;
+    }
+  } catch (err) {
+    log("Enrichment failed:", err);
+  }
+  return null;
 }
 
 // ── Scraper Management ────────────────────────────────────────────────────────
@@ -267,33 +332,64 @@ accessEmailBtn?.addEventListener('click', async () => {
 
       if (res?.success && res.data && res.data !== 'Not Available') {
         const emailValue = res.data;
-        console.log(`Email extracted: ${emailValue}`);
-        emailText.textContent = emailValue;
-        show(emailResult);
-        accessEmailBtn.innerHTML = `Email found: ${emailValue}`;
-        accessEmailBtn.style.background = 'rgba(52,211,153,0.1)';
-        accessEmailBtn.style.borderColor = 'var(--green)';
-        accessEmailBtn.style.color = 'var(--green)';
-        
-        if (scrapedLeadData) {
-          scrapedLeadData.email = emailValue;
-        }
-        // Keep cache active for immediate reload
-        chrome.storage.local.get(['active_profile'], (s) => {
-          const currentActive = s.active_profile as Partial<LeadData> || {};
-          chrome.storage.local.set({ 
-            active_profile: { ...currentActive, email: emailValue } 
-          });
-        });
-        navigator.clipboard.writeText(res.data);
-        showToast('Email extracted and copied!');
+        handleEmailFound(emailValue);
       } else {
-        accessEmailBtn.innerHTML = 'Not Found';
-        accessEmailBtn.disabled = false;
-        showToast('Email not found on profile.', true);
+        // FALLBACK: Enrichment Logic
+        log("LinkedIn email not found. Triggering enrichment fallback...");
+        if (scrapedLeadData) {
+          accessEmailBtn.innerHTML = '<div class="scan-spinner"></div> Enriched guessing...';
+          enrichProfile(scrapedLeadData).then(res => {
+            if (res && res.data) {
+              handleEmailFound(res.data.email, res.data);
+            } else {
+              accessEmailBtn.innerHTML = 'Not Found';
+              accessEmailBtn.disabled = false;
+              const msg = res?.message || 'No publicly available verified email found.';
+              showToast(msg, true);
+            }
+          });
+        } else {
+          accessEmailBtn.innerHTML = 'Not Found';
+          accessEmailBtn.disabled = false;
+          showToast('Email not found on profile.', true);
+        }
       }
     });
   };
+
+  function handleEmailFound(email: string, enrichment?: any) {
+    console.log(`Email found: ${email}`);
+    emailText.textContent = email;
+    show(emailResult);
+    
+    if (enrichment) {
+      renderEnrichment(enrichment);
+      accessEmailBtn.innerHTML = `Guess: ${email}`;
+      if (scrapedLeadData) scrapedLeadData.enrichment = enrichment;
+    } else {
+      accessEmailBtn.innerHTML = `Email found: ${email}`;
+      enrichmentInfo.style.display = 'none';
+    }
+    
+    accessEmailBtn.style.background = 'rgba(52,211,153,0.1)';
+    accessEmailBtn.style.borderColor = 'var(--green)';
+    accessEmailBtn.style.color = 'var(--green)';
+    
+    if (scrapedLeadData) {
+      scrapedLeadData.email = email;
+    }
+    
+    // Cache update
+    chrome.storage.local.get(['active_profile'], (s) => {
+      const currentActive = s.active_profile as Partial<LeadData> || {};
+      chrome.storage.local.set({ 
+        active_profile: { ...currentActive, email, enrichment } 
+      });
+    });
+    
+    navigator.clipboard.writeText(email);
+    showToast(enrichment ? 'Email guessed and copied!' : 'Email extracted and copied!');
+  }
 
   attemptEmail(0);
 });
@@ -369,7 +465,7 @@ saveBtn?.addEventListener('click', async () => {
     console.log("Lead to save:", lead);
     console.log("Sending lead to backend...");
     try {
-      const response = await fetch("http://localhost:3000/api/leads", {
+      const response = await fetch("http://localhost:3001/api/leads", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

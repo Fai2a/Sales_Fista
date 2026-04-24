@@ -1,19 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "LinkedIn Profile Scraper",
+  "name": "LeadVault",
   "version": "1.0.0",
   "description": "Scrape LinkedIn profile data and save it directly to the Next.js Dashboard.",
   "permissions": [
     "activeTab",
     "scripting",
-    "storage",
-    "webNavigation"
+    "storage"
   ],
   "host_permissions": [
     "https://www.linkedin.com/in/*",
-    "https://fresh-linkedin-scraper-api.p.rapidapi.com/*",
-    "https://fresh-linkedin-profile-data.p.rapidapi.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3001/*",
+    "http://127.0.0.1:3001/*"
   ],
   "action": {
     "default_popup": "popup.html"
